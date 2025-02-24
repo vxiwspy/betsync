@@ -4,4 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "colorama>=0.4.6",
+    "discord-py>=2.5.0",
+]
