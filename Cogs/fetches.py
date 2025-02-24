@@ -1,6 +1,6 @@
 
 import os
-import request
+import requests
 import discord
 from discord.ext import commands
 from colorama import Fore

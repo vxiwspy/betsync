@@ -11,6 +11,10 @@ bot.remove_command("help")
 cogs = ["Cogs.guide", "Cogs.fetches"]
 
 @bot.event
+async def on_command_error(ctx, command):
+    print(f"{Fore.RED}[-] {Fore.WHITE} Some monkey {Fore.BLACK}{ctx.message.author}{Fore.WHITE} tried to use a non existsent command 💔💔💔")
+
+@bot.event
 async def on_ready():
     os.system("clear")
     print(f"{Fore.GREEN}[+] {Fore.WHITE}{bot.user}\n")
