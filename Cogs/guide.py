@@ -5,7 +5,7 @@ from .emojis import emoji
 
 class Guide(commands.Cog):
 	def __init__(self, bot):
-			
+
 		self.emojis = emoji()
 		self.required = [self.emojis["money"]]	
 		self.bot = bot
@@ -18,7 +18,7 @@ class Guide(commands.Cog):
 		embed.add_field(name=":gift: **Earn Free Tokens**", value="- **Daily Reward**: Use `!daily` to claim **free tokens**.\n- **Giveaways**: Look out for **airdrops** hosted \n- **Tips**: Other players can **tip you tokens**.\n- **Rakeback:** Get **cashback** on bets via `!rakeback` **(based on deposits).**\n", inline=False)
 		embed.add_field(name=":video_game: **Playing Games**", value="- S**ee All Games:** Use `!help` to view available games.\n- **Multiplayer Games:** Use `!multiplayer` to see PvP games.\n - **Popular Games:** Play **Blackjack**,** Keno:**, **Towers:**, **Mines:**, **Coinflip**, and more!\n Each game has a **detailed command:**, e.g., `!blackjack` for rules, bets, and payouts.\n", inline=False)
 		embed.add_field(name=":shield: **Fairness & Security**", value="- All games use **cryptographically secure random number generation**\n- **Provably Fair**: Every bet is `verifiable and unbiased`.\n- **98.5% RTP**: Fair odds compared to other casinos\n", inline=False)
-		embed.add_field(name=":scroll: **Example Commands**", value="", inline=False)
+		embed.add_field(name=":scroll: **Example Commands**", value="• `!deposit` → **Deposit** • `!withdraw` → **Withdraw** • `!rate 100 BTC` → **Convert** • `!blackjack 10` → **Bet** • `!mines 5 3` → **Play Mines** • `!help` → **All Commands**", inline=False)
 		embed.add_field(name=":question_mark: **Need Help?**", value="- For support, type `!support` and **submit a request.**\n- Got **feedback?** Let us know!", inline=False)
 		embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
 		embed.set_thumbnail(url=self.bot.user.avatar.url)
