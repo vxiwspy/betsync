@@ -1,14 +1,19 @@
 import discord
+import json
 from discord.ext import commands
 
 class Guide(commands.Cog):
 	def __init__(self, bot):
+		with open("emojis.json", "r") as f:
+			self.emoji_raw = f
+			
+		self.emojis = json.load(self.emoji_raw)
 		self.bot = bot
 
 	@commands.command()
 	async def guide(self, ctx):
-		embed = discord.Embed(title="ðŸŽ° **Welcome to BetSync Casino!**", color=0x00FFAE, description="**BetSync** is a **Crypto Powered Casino** where you can bet, win, and enjoy a variety of games. We offer **fast deposits**, **fair games**, and **multiple earning methods**! Hereâ€™s everything you need to know to get started:\nã…¤ã…¤ã…¤ã…¤ã…¤ã…¤ã…¤")
-		embed.add_field(name="ðŸ'° **Tokens & Credits**", value="â€¢ **Tokens**: Used for **betting and playing games**.Use `!deposit` to get tokens\nâ€¢ **Credits**: Rewarded after **winning a bet**, Used for **withdrawals**`!withdraw <credits` and **Betting**.\nâ€¢ **Conversion Rates**:\n```\n1 Token/Credit = $0.013\n```\nUse `!rate <amount> <currency>` to convert between **Tokens**, **Credits**, and **crypto**.\nã…¤ã…¤ã…¤ã…¤ã…¤ã…¤ã…¤", inline=False)
+		embed = discord.Embed(title=":slot_machine: **Welcome to BetSync Casino!**", color=0x00FFAE, description="**BetSync** is a **Crypto Powered Casino** where you can bet, win, and enjoy a variety of games. We offer **fast deposits**, **fair games**, and **multiple earning methods**! Hereâ€™s everything you need to know to get started:\n")
+		embed.add_field(name=f"{self.emojis.money} **Tokens & Credits**", value="- **Tokens**: Used for **betting and playing games**.Use `!deposit` to get tokens\n- **Credits**: Rewarded after **winning a bet**, Used for **withdrawals**`!withdraw <credits` and **Betting**.\n- **Conversion Rates**:\n```\n1 Token/Credit = $0.013\n```\nUse `!rate <amount> <currency>` to convert between **Tokens**, **Credits**, and **crypto**.\nã…¤ã…¤ã…¤ã…¤ã…¤ã…¤ã…¤", inline=False)
 		embed.add_field(name="ðŸ¥ **Deposits & Withdrawals**", value="â€¢ **Deposit**: Use `!deposit` to select a currency and get a address\nâ€¢ **Minimum Deposit**: Check in `!help`\nâ€¢ **Withdraw**: Use `!withdraw`.\nâ€¢**Minimum Withdrawal**: 20 Credits.\nâ€¢ **Processing**: Deposits are instant after 1 confirmation. Withdrawals take a few minutes.\nã…¤ã…¤ã…¤ã…¤ã…¤ã…¤ã…¤", inline=False)
 		embed.add_field(name="ðŸŽ **Earn Free Tokens**", value="â€¢ **Daily Reward**: Use `!daily` to claim **free tokens**.\nâ€¢ **Giveaways**: Look out for **airdrops** hosted \nâ€¢ **Tips**: Other players can **tip you tokens**.\nâ€¢ **Rakeback:** Get **cashback** on bets via `!rakeback` **(based on deposits).**\nã…¤ã…¤ã…¤ã…¤ã…¤ã…¤ã…¤", inline=False)
 		embed.add_field(name="ðŸŽ® **Playing Games**", value="â€¢ See All Games: Use `!help` to view available games.\nâ€¢ Multiplayer Games: Use `!multiplayer` to see PvP games.\nâ€¢ :**Popular Games:** Play **Blackjack**,** Keno:**, **Towers:**, **Mines:**, **Coinflip**, and more\n!Each game has a **detailed command:**, e.g., `!blackjack` for rules, bets, and payouts.\nã…¤ã…¤ã…¤ã…¤ã…¤ã…¤ã…¤", inline=False)
