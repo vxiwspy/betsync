@@ -7,8 +7,7 @@ from discord.ui import Button, View
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 bot.remove_command("help")
 
-
-cogs = ["Cogs.guide", "Cogs.fetches"]
+cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start"]
 
 @bot.event
 async def on_command_error(ctx, command):
@@ -20,7 +19,7 @@ async def on_ready():
     print(f"{Fore.GREEN}[+] {Fore.WHITE}{bot.user}\n")
     for i in cogs:
         try:
-            await bot.load_extension(i)
+            bot.load_extension(i)
             print(f"{Fore.GREEN}[+] {Fore.WHITE}Loaded Cog: {Fore.GREEN}{i}{Fore.WHITE}")
         except Exception as e:
             print(f"{Fore.RED}[-] {Fore.WHITE}FIX THIS YOU NIGGER {e}")

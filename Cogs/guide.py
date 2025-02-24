@@ -1,7 +1,7 @@
 import discord
 import json
 from discord.ext import commands
-from .emojis import emoji
+from Cogs.utils.emojis import emoji
 
 class Guide(commands.Cog):
 	def __init__(self, bot):
@@ -26,5 +26,5 @@ class Guide(commands.Cog):
 
 		await ctx.message.reply(embed=embed)
 
-async def setup(bot):
-    await bot.add_cog(Guide(bot))
+def setup(bot):
+    bot.add_cog(Guide(bot))

@@ -38,7 +38,7 @@ class Fetches(commands.Cog):
             )
             embed.set_thumbnail(url=bot_icon)
             embed.set_footer(text="BetSync Casino • Live Exchange Rates", icon_url=bot_icon)
-            return await ctx.send(embed=embed)
+            return await ctx.message.reply(embed=embed)
 
         currency = currency.upper()
         prices = self.get_crypto_prices()
@@ -50,7 +50,7 @@ class Fetches(commands.Cog):
                 color=0xFF0000
             )
             embed.set_footer(text="BetSync Casino", icon_url=bot_icon)
-            return await ctx.send(embed=embed)
+            return await ctx.message.reply(embed=embed)
 
         conversion_rates = {
             "BTC": prices.get("bitcoin", {}).get("usd"),
@@ -71,7 +71,7 @@ class Fetches(commands.Cog):
             )
             embed.set_thumbnail(url=bot_icon)
             embed.set_footer(text="BetSync Casino", icon_url=bot_icon)
-            return await ctx.send(embed=embed)
+            return await ctx.message.reply(embed=embed)
 
         usd_value = amount * 0.013
         converted_amount = usd_value / conversion_rates[currency]
@@ -97,7 +97,7 @@ class Fetches(commands.Cog):
         embed.set_thumbnail(url=bot_icon)
         embed.set_footer(text="BetSync Casino • Live Exchange Rates", icon_url=bot_icon)
 
-        await ctx.send(embed=embed)
+        await ctx.message.reply(embed=embed)
 
-async def setup(bot):
-    await bot.add_cog(Fetches(bot))
+def setup(bot):
+    bot.add_cog(Fetches(bot))
