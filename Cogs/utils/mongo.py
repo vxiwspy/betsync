@@ -22,7 +22,11 @@ class Users():
             return new_user.inserted_id
 
     def fetch_user(self, user_id):
-        return self.collection.find({"discord_id": user_id})
+        if self.collection.count_documents({"discord_id": user_id}):
+            return self.collection.find_one({"discord_id": user_id})
+
+        else:
+            return False
 
     def update_balance(self, user_id, amount, currency: str = "tokens"):
         return
