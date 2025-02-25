@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+import os
 
 mongodb = MongoClient(os.environ["MONGO_URI"])
 
@@ -8,18 +9,20 @@ class Users():
         self.db = mongodb["BetSync"]
         self.collection = self.db["Users"]
         
-	def get_all_users(self):
-		return self.collection.find()
+    def get_all_users(self):
+        return self.collection.find()
 
-	def register_new_user(self, user_data):
+    def register_new_user(self, user_data):
         
-		discordid = userdata_["discord_id"]
+        discordid = user_data["discord_id"]
         if self.collection.count_documents({"discord_id": discordid}):
             return False
         else:
-        	new_user = self.collection.insert_one(user_data)
-        	return new_user.inserted_id
+            new_user = self.collection.insert_one(user_data)
+            return new_user.inserted_id
 
-	def fetch_user(self, user_id):
+    def fetch_user(self, user_id):
         return self.collection.find({"discord_id": user_id})
 
+    def update_balance(self, user_id, amount, currency: str = "tokens"):
+        return

@@ -2,14 +2,13 @@ import os
 import discord
 from colorama import Fore
 from discord.ext import commands
-from discord.ui import Button, View
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 bot.remove_command("help")
 
-cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start"]
+cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start" , "Cogs.currency"]
 
-@bot.event
+#@bot.event
 async def on_command_error(ctx, command):
     print(f"{Fore.RED}[-] {Fore.WHITE} Some monkey {Fore.BLACK}{ctx.message.author}{Fore.WHITE} tried to use a non existsent command 💔💔💔")
 
