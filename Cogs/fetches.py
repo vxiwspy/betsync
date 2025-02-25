@@ -148,5 +148,32 @@ class Fetches(commands.Cog):
 
         await ctx.reply(embed=embed)
 
+    @commands.command(aliases=["bal"])
+    async def balance(self, ctx, user:discord.Member = None):
+        if user is None:
+            user = ctx.author
+        else:
+            db = Users()
+            if db.fetch_user(user.id) == False: 
+                await ctx.reply("**User Does Not Have An Account.**")
+                return
+            else:
+                pass
+            pass
+            
+        token_value = 0.0212
+        db = Users()
+        info = db.fetch_user(user.id)
+        tokens = info["tokens"]
+        credits = info["credits"]
+        money = emoji()["money"]
+        embed = discord.Embed(title=f"{money} | {user.name}\'s Balance", color=discord.Color.blue(), thumbnail=user.avatar.url)
+        embed.add_field(name=":moneybag: Tokens", value=f"```{tokens} Tokens (~${(tokens * token_value)})```")
+        embed.add_field(name=":money_with_wings: Credits", value=f"```{credits} Credits (~${(credits * token_value)})```")
+        embed.set_footer(text="Betsync Casino", icon_url=self.bot.user.avatar.url)
+        await ctx.reply(embed=embed)
+        
+        
+
 def setup(bot):
     bot.add_cog(Fetches(bot))
