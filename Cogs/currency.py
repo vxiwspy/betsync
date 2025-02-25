@@ -7,6 +7,8 @@ import time
 from PIL import Image, ImageFont, ImageDraw
 from discord.ext import commands
 from Cogs.utils.mongo import Users
+from Cogs.utils.emojis import emoji
+from colorama import Fore
 
 class DepositCancelView(discord.ui.View):
     """
@@ -20,6 +22,7 @@ class DepositCancelView(discord.ui.View):
         self.user_id = user_id
         self.deposit_address = deposit_address
         self.deposit_amount = deposit_amount
+        self.loading_msg = None
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger)
     async def cancel_button(self, button, interaction: discord.Interaction):
@@ -146,6 +149,7 @@ class Deposit(commands.Cog):
         except requests.exceptions.JSONDecodeError:
             print(f"[ERROR] Non-JSON response: {response.text}")
             return None
+
 
     @commands.command(aliases=["depo"])
     async def dep(self, ctx, currency: str = None, amount: float = None):
@@ -321,6 +325,7 @@ class Deposit(commands.Cog):
             )
 
         # Mark the deposit as pending
+        #await self.loading_msg.delete()
         self.pending_deposits[ctx.author.id] = {
             "address": deposit_address,
             "amount": converted_amount,
@@ -355,6 +360,19 @@ class Deposit(commands.Cog):
                 color=0x00FF00
             )
             return user.send(embed=embed)
+
+    @dep.before_invoke
+    async def before(self, ctx):
+        loading_emoji = emoji()["loading"]
+        #self.loading_msg = await ctx.reply(embed=discord.Embed(title=f"{loading_emoji} Running Your Command", description="`Please be paitient while we validate your credentials...`", color=discord.Color.green()))
+        db = Users()
+        if db.fetch_user(ctx.author.id) != False:
+        #await loading_msg.delete()
+            pass
+        else:
+            print(f"{Fore.YELLOW}[~] {Fore.WHITE}New User Detected... {Fore.BLACK}{ctx.author.id}{Fore.WHITE} {Fore.YELLOW}")
+            dump = {"discord_id": ctx.author.id, "tokens": 0, "credits": 0, "history": [], "total_deposit_amount": 0, "total_withdraw_amount": 0, "total_spent": 0, "total_earned": 0, 'total_played': 0, 'total_won': 0, 'total_lost':0}
+            db.register_new_user(dump)
 
 def setup(bot):
     bot.add_cog(Deposit(bot))

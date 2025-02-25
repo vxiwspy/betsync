@@ -4,6 +4,8 @@ from colorama import Fore
 from discord.ext import commands
 from pymongo import ReturnDocument
 from Cogs.utils.mongo import Users
+from Cogs.utils.emojis import emoji
+
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 bot.remove_command("help")
@@ -15,9 +17,10 @@ async def on_command_error(ctx, command):
     print(f"{Fore.RED}[-] {Fore.WHITE} Some monkey {Fore.BLACK}{ctx.message.author}{Fore.WHITE} tried to use a non existsent command 💔💔💔")
 
 @bot.event
-async def on_command(ctx):
+async def on_command(ctx): 
     db = Users()
     if db.fetch_user(ctx.author.id) != False:
+        #await loading_msg.delete()
         return
     else:
         print(f"{Fore.YELLOW}[~] {Fore.WHITE}New User Detected... {Fore.BLACK}{ctx.author.id}{Fore.WHITE} {Fore.YELLOW}")
@@ -27,6 +30,7 @@ async def on_command(ctx):
         print(f"{Fore.GREEN}[+] {Fore.WHITE}New User Registered... {Fore.BLACK}{ctx.author.id}{Fore.WHITE} {Fore.GREEN}{info}{Fore.WHITE}")
         embed = discord.Embed(title=":wave: Welcome to BetSync Casino!", color=0x00FFAE, description="**Type** `!guide` **to get started**")
         embed.set_footer(text="BetSync Casino", icon_url=bot.user.avatar.url)
+        #await loading_msg.delete()
         await ctx.reply("By using BetSync, agree to our TOS. Type `!tos` to know more.", embed=embed)
 
 @bot.event

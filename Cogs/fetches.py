@@ -3,6 +3,7 @@ import os
 import requests
 import discord
 from discord.ext import commands
+from Cogs.utils.emojis import emoji
 from Cogs.utils.mongo import Users
 from colorama import Fore
 
@@ -118,30 +119,34 @@ class Fetches(commands.Cog):
             profit = info["total_earned"]
             games_won = info["total_won"]
             games_lost = info["total_lost"]
+            spent = info["total_spent"]
             
             
             
             
-
+        moneybag = emoji()["money"]
+        statsemoji = emoji()["stats"]
         # Create embed
         embed = discord.Embed(title=f":star: | Stats for {user.name}", color=discord.Color.blue())
-        embed.add_field(name=":moneybag: Deposits:", value=f"**{deposits}** Tokens", inline=False)
-        embed.add_field(name=":outbox_tray: Withdrawals:", value=f"**{withdrawals}** Credits", inline=False)
+        embed.add_field(name=f"{moneybag} **Deposits:**", value=f"```{deposits} Tokens```", inline=False)
+        embed.add_field(name=":outbox_tray: **Withdrawals:**", value=f"```{withdrawals} Credits```", inline=False)
         #embed.add_field(
             #name=":gift: Tips:",
             #value=f"Sent: **{tokens_tipped}** tokens, **{credits_tipped}** credits\n Received: **{tokens_received}** tokens, **{credits_received}** credits",
         #inline=False
     #)
-        embed.add_field(
-            name=":video_game: Games:",
-            value=f"Played: **{games_played}** games\nNet Profit: **{profit}** tokens\nGames Won: **{games_won}** games\nGames Lost: **{games_lost}** games",
-            inline=False
-        )
+        embed.add_field(name=":money_bag: Wagered", value=f"```{spent} Tokens```")
+        embed.add_field(name=":money_with_wings: Won", value=f"```{profit} Credits```")
+        #embed.add_field(
+            #name=f"{statsemoji} Games:",
+            #value=f":video_game: **Played: {games_played} games**\n:trophy: **Games Won: {games_won} games**\n",
+            #inline=False
+        #)
         #embed.add_field(name=":medal: Badges:", value=badge_text, inline=False)
-        embed.set_footer(text="BetSync", icon_url=self.bot.user.avatar.url if self.bot.user.avatar else self.bot.user.default_avatar.url)
+        embed.set_footer(text="BetSync User Stats", icon_url=self.bot.user.avatar.url if self.bot.user.avatar else self.bot.user.default_avatar.url)
 
 
-        await ctx.send(embed=embed)
+        await ctx.reply(embed=embed)
 
 def setup(bot):
     bot.add_cog(Fetches(bot))
