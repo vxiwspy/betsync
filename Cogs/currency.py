@@ -3,23 +3,37 @@ import requests
 import qrcode
 import io
 from discord.ext import commands
+from colorama import Fore
 from Cogs.utils.mongo import Users
 from Cogs.utils.emojis import emoji
 
-class Currency(commands.Cog):
+class Deposit(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.supported_currencies = {"BTC": "bitcoin", "LTC": "litecoin", "SOL": "solana", "ETH": "ethereum", "USDT": "tether"}
-        self.target_currency = "usdcalgo"
-        self.api_key = "d676247c-fbc2-4490-9fbf-e0e60a4e2066" #good job gng thanks <3
+        self.target_currency = "usdcalgo"  
+        self.api_key = "d676247c-fbc2-4490-9fbf-e0e60a4e2066"
+        self.supported_currencies = {
+            "BTC": "btc",
+            "LTC": "ltc",
+            "SOL": "sol",
+            "ETH": "eth",
+            "USDT": "usdt"
+        }
+
 
     def get_minimum_deposit(self, currency):
-        url = f"https://api.simpleswap.io/v1/get_ranges?api_key={self.api_key}&currency_from={currency}&currency_to={self.target_currency}"
+        url = f"https://api.simpleswap.io/v1/get_ranges?api_key={self.api_key}&currency_from={currency}&currency_to={self.target_currency}&fixed=false"
         response = requests.get(url)
+
+        print(f"\n{Fore.YELLOW}[~] {Fore.WHITE}API URL: {Fore.GREEN}{url}{Fore.WHITE}")
+        print(f"{Fore.YELLOW}[~] {Fore.WHITE}Status Code: {Fore.GREEN}{response.status_code}{Fore.WHITE}")
+        print(f"{Fore.YELLOW}[~] {Fore.WHITE}Response Body: {Fore.GREEN}{response.text}{Fore.WHITE}")
+
         if response.status_code == 200:
             data = response.json()
-            return data.get("min", None)
-        return None
+            return data.get("min", None), response.text
+        return None, response.text
+
 
     @commands.command(aliases=["depo"])
     async def dep(self, ctx, currency: str = None, amount: float = None):
@@ -32,18 +46,18 @@ class Currency(commands.Cog):
         if currency not in self.supported_currencies:
             return await ctx.reply(embed=discord.Embed(title=":x: Invalid Currency", description=f"`{currency}` is not supported. Use BTC, LTC, SOL, ETH, USDT.", color=0xFF0000))
 
-        min_deposit = self.get_minimum_deposit(self.supported_currencies[currency])
+        min_deposit, api_response = self.get_minimum_deposit(self.supported_currencies[currency])
         if not min_deposit:
-            return await ctx.reply(embed=discord.Embed(title=":x: API Error", description="Could not retrieve minimum deposit amount. Try again later.", color=0xFF0000))
+            return await ctx.reply(embed=discord.Embed(title=":x: API Error", description=f"SimpleSwap returned an error. Try again later.\n```{api_response}```", color=0xFF0000))
 
-        if amount < min_deposit:
+        if amount < float(min_deposit):
             return await ctx.reply(embed=discord.Embed(title=":warning: Amount Too Low", description=f"Minimum deposit for {currency} is **{min_deposit} USD**.", color=0xFFA500))
 
         user = Users().fetch_user(ctx.author.id)
         if not user:
             return await ctx.reply(embed=discord.Embed(title=":x: Not Registered", description="Use `!signup` to register first!", color=0xFF0000))
 
-        deposit_address = "GENERATED_CRYPTO_ADDRESS"
+        deposit_address = "GRTDJ7BFUWZYL5344ZD4KUWVALVKSBR4LNY62PRCL5E4664QHM4C4YLNFQ"
         qr = qrcode.make(deposit_address)
         img_buf = io.BytesIO()
         qr.save(img_buf, format='PNG')
@@ -68,4 +82,4 @@ class Currency(commands.Cog):
             return user.send(embed=embed)
 
 def setup(bot):
-    bot.add_cog(Currency(bot))
+    bot.add_cog(Deposit(bot))
