@@ -36,6 +36,8 @@ class DepositCancelView(discord.ui.View):
         # Remove pending deposit if it exists
         if self.user_id in self.cog.pending_deposits:
             del self.cog.pending_deposits[self.user_id]
+            # Reset the cooldown for the deposit command
+            self.cog.dep.reset_cooldown(interaction)
         # Disable all buttons in the view
         for child in self.children:
             child.disabled = True
