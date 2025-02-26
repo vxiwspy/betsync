@@ -43,7 +43,16 @@ class DepositCancelView(discord.ui.View):
                 cooldowns = cmd._buckets._cooldown
                 if cooldowns:
                     # Create context for cooldown reset
-                    dummy_message = discord.Message(state=interaction.message._state, channel=interaction.channel, data={'id': 0, 'content': '!dep'})
+                    dummy_message = discord.Message(state=interaction.message._state, channel=interaction.channel, data={
+                'id': 0,
+                'content': '!dep',
+                'attachments': [],
+                'embeds': [],
+                'mention_everyone': False,
+                'tts': False,
+                'type': 0,
+                'pinned': False
+            })
                     dummy_message.author = interaction.user
                     ctx = await self.cog.bot.get_context(dummy_message)
                     # Reset all cooldowns for this user
