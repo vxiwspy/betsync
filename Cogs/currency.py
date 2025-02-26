@@ -51,7 +51,10 @@ class DepositCancelView(discord.ui.View):
                 'mention_everyone': False,
                 'tts': False,
                 'type': 0,
-                'pinned': False
+                'pinned': False,
+                'edited_timestamp': None,
+                'author': {'id': interaction.user.id},
+                'timestamp': '2024-01-01T00:00:00+00:00'
             })
                     dummy_message.author = interaction.user
                     ctx = await self.cog.bot.get_context(dummy_message)
@@ -471,12 +474,19 @@ class Deposit(commands.Cog):
             dm_channel = ctx.author.dm_channel or await ctx.author.create_dm()
             await dm_channel.send(embed=deposit_embed, file=file, view=view)
             await loading_message.delete()
+            wait_embed = discord.Embed(
+                title="⏳ | Processing Deposit",
+                description="Please wait while we process your deposit...",
+                color=discord.Color.gold()
+            )
+            wait_msg = await ctx.reply(embed=wait_embed)
+            
             success_embed = discord.Embed(
                 title="<:checkmark:1344252974188335206> | Deposit Details Sent!",
                 description="Check your DMs for the deposit details.",
                 color=discord.Color.green()
             )
-            await ctx.reply(embed=success_embed, delete_after=10)
+            await wait_msg.edit(embed=success_embed, delete_after=10)
         except discord.Forbidden:
             await loading_message.delete()
             return await ctx.reply(
