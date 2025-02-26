@@ -293,18 +293,49 @@ class Deposit(commands.Cog):
                 )
             )
 
-        # Generate QR Code for the deposit address
-        qr = qrcode.make(deposit_address)
+        # Generate QR Code with the deposit information
+        qr_data = f"Amount: {converted_amount:.6f} {currency}\nAddress: {deposit_address}"
+        qr = qrcode.QRCode(version=1, box_size=10, border=2)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Create a new white background image
+        background = Image.new('RGBA', (600, 800), 'white')
+        
+        # Resize QR code to be smaller
+        qr_img = qr_img.resize((400, 400))
+        
+        # Calculate position to center QR code
+        qr_x = (background.width - qr_img.width) // 2
+        qr_y = 150
+        background.paste(qr_img, (qr_x, qr_y))
+        
+        # Add text with better fonts
+        draw = ImageDraw.Draw(background)
+        title_font = ImageFont.truetype("roboto.ttf", 36)
+        detail_font = ImageFont.truetype("roboto.ttf", 24)
+        
+        # Add text elements
+        draw.text((300, 50), f"{ctx.author.name}'s Deposit QR", font=title_font, anchor="mm", fill="black")
+        draw.text((300, qr_y + qr_img.height + 30), f"Amount: {converted_amount:.6f} {currency}", font=detail_font, anchor="mm", fill="black")
+        draw.text((300, qr_y + qr_img.height + 70), "Scan to get address", font=detail_font, anchor="mm", fill="black")
+        
+        # Add semi-transparent watermark
+        watermark = "BETSYNC"
+        watermark_font = ImageFont.truetype("roboto.ttf", 72)
+        watermark_bbox = draw.textbbox((0, 0), watermark, font=watermark_font)
+        watermark_width = watermark_bbox[2] - watermark_bbox[0]
+        watermark_x = (background.width - watermark_width) // 2
+        watermark_y = 650
+        
+        # Draw watermark with transparency
+        draw.text((watermark_x, watermark_y), watermark, font=watermark_font, fill=(0, 0, 0, 64))
+        
+        # Save to bytes
         img_buf = io.BytesIO()
-        qr.save(img_buf, format='PNG')
+        background.save(img_buf, format='PNG')
         img_buf.seek(0)
-        image = Image.open(img_buf)
-        # image = image.resize((1024, 1024))
-        font = ImageFont.truetype("roboto.ttf", 22)
-        font2 = ImageFont.truetype(font="roboto.ttf", size=18)
-        draw = ImageDraw.Draw(image)
-        draw.text((256, 12), "BetSync", font=font)
-        draw.text((90, 335), f"{ctx.author.name}\'s wallet address", font=font)
         with io.BytesIO() as image_binary:
             image.save(image_binary, 'PNG')
             image_binary.seek(0)
