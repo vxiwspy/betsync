@@ -9,6 +9,8 @@ from discord.ext import commands
 from Cogs.utils.mongo import Users
 from Cogs.utils.emojis import emoji
 from colorama import Fore
+import re
+
 
 class DepositCancelView(discord.ui.View):
     """
@@ -39,7 +41,7 @@ class DepositCancelView(discord.ui.View):
             child.disabled = True
         await interaction.response.edit_message(view=self)
         cancel_embed = discord.Embed(
-            title="❌ DEPOSIT CANCELLED",
+            title="<:no:1344252518305234987> | DEPOSIT CANCELLED",
             description="Your deposit has been cancelled as per your request.\n\nIf you'd like to try again, use `!dep`.",
             color=discord.Color.red()
         )
@@ -47,15 +49,16 @@ class DepositCancelView(discord.ui.View):
 
     @discord.ui.button(label="Copy", style=discord.ButtonStyle.secondary)
     async def copy_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-            # Ensure only the deposit owner can use the copy button
+        # Ensure only the deposit owner can use the copy button
         if interaction.user.id != self.user_id:
             return await interaction.response.send_message(
-                    "You cannot copy someone else's deposit details.", ephemeral=True
-                )
-            # Send plain text messages (not embeds) so mobile users can easily copy the info.
-        await interaction.response.send_message(f"Deposit Address: {self.deposit_address}", ephemeral=True)
-        #await interaction.followup.send_message(f"Deposit Amount: {self.deposit_amount:.6f}", ephemeral=True)
-        # Send two ephemeral messages: one for the deposit address and one for the deposit amount.
+                "You cannot copy someone else's deposit details.", ephemeral=True
+            )
+        # Send the deposit address as one ephemeral message
+        await interaction.response.send_message(f" {self.deposit_address}", ephemeral=True)
+        # Send the deposit amount as a separate ephemeral followup message
+        await interaction.followup.send(f" {self.deposit_amount:.6f}", ephemeral=True)
+
         address_embed = discord.Embed(
             title="Deposit Address",
             description=f"```{self.deposit_address}```",
@@ -70,6 +73,7 @@ class DepositCancelView(discord.ui.View):
         await interaction.response.send_message(embed=address_embed, ephemeral=True)
         # Then, send a followup message with the deposit amount.
         await interaction.followup.send(embed=amount_embed, ephemeral=True)
+
 
 class Deposit(commands.Cog):
     def __init__(self, bot):
@@ -86,6 +90,19 @@ class Deposit(commands.Cog):
         self.pending_deposits = {}
         self.deposit_timeout = 600  # 10 minutes
 
+    def get_crypto_prices(self):
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {
+            "ids": "bitcoin,ethereum,litecoin,solana",
+            "vs_currencies": "usd"
+        }
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"{Fore.RED}[-] {Fore.WHITE}Failed to fetch crypto prices. Status Code: {Fore.RED}{response.status_code}{Fore.WHITE}")
+            return None
+
     def get_conversion_rate(self, currency, amount):
         url = (
             f"https://api.simpleswap.io/v1/get_estimated?"
@@ -97,11 +114,43 @@ class Deposit(commands.Cog):
             data = response.json()
             if isinstance(data, (float, int, str)):
                 return float(data)
+            elif isinstance(data, dict) and data.get("code") == 422:
+                # Parse the minimum value from the description string
+                desc = data.get("description", "")
+                match = re.search(r"Min:\s*([\d.]+)", desc)
+                if match:
+                    min_deposit_crypto = float(match.group(1))
+                    return {"error": "amount_too_low", "min": min_deposit_crypto}
+                else:
+                    print(f"[ERROR] Could not parse minimum deposit from: {desc}")
+                    return None
             else:
                 print(f"[ERROR] Unexpected conversion response: {data}")
                 return None
         except requests.exceptions.JSONDecodeError:
             print(f"[ERROR] Non-JSON response: {response.text}")
+            return None
+
+    def get_usdcalgo_to_usd(self, amount):
+        """
+        Converts a given amount of USDC (Algo) to USD using CoinGecko.
+        Since USDC is pegged to USD, this should normally return a 1:1 conversion.
+        """
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {
+            "ids": "usd-coin",
+            "vs_currencies": "usd"
+        }
+        response = requests.get(url, params=params)
+        try:
+            data = response.json()
+            rate = data.get("usd-coin", {}).get("usd")
+            if rate is None:
+                print("[ERROR] Could not fetch USD conversion rate for USDC from CoinGecko.")
+                return None
+            return float(rate) * float(amount)
+        except Exception as e:
+            print(f"[ERROR] Exception in get_usdcalgo_to_usd: {e}")
             return None
 
     def get_minimum_deposit(self, currency):
@@ -150,7 +199,6 @@ class Deposit(commands.Cog):
             print(f"[ERROR] Non-JSON response: {response.text}")
             return None
 
-
     @commands.command(aliases=["depo"])
     async def dep(self, ctx, currency: str = None, amount: float = None):
         """
@@ -160,7 +208,7 @@ class Deposit(commands.Cog):
         # Prevent duplicate deposits
         if ctx.author.id in self.pending_deposits:
             embed = discord.Embed(
-                title="❌ Pending Deposit",
+                title="<:no:1344252518305234987> | Pending Deposit",
                 description="You already have a pending deposit. Please wait for it to expire or cancel it before starting a new one.",
                 color=discord.Color.red()
             )
@@ -183,60 +231,44 @@ class Deposit(commands.Cog):
         if currency not in self.supported_currencies:
             return await ctx.reply(
                 embed=discord.Embed(
-                    title=":x: Invalid Currency",
+                    title="<:no:1344252518305234987> | Invalid Currency",
                     description=f"`{currency}` is not supported. Use BTC, LTC, SOL, ETH, USDT.",
                     color=0xFF0000
                 )
             )
 
-        # Check minimum deposit requirement
-        min_deposit = self.get_minimum_deposit(self.supported_currencies[currency])
-        if min_deposit is None:
-            return await ctx.reply(
-                embed=discord.Embed(
-                    title=":x: Minimum Check Error",
-                    description="Could not fetch minimum deposit amount. Please try again later.",
-                    color=discord.Color.red()
-                )
-            )
-        elif amount < min_deposit:
-            min_deposit_info = "\n".join([
-                f"**{cur}**: {self.get_minimum_deposit(self.supported_currencies[cur]):.2f} USD" 
-                for cur in self.supported_currencies
-            ])
-
-            min_embed = discord.Embed(
-                title=":warning: Amount Too Low",
-                description=(
-                    f"The minimum deposit for **{currency}** is **{min_deposit:.2f} USD**.\n"
-                    "Please increase your deposit amount and try again.\n\n"
-                    "**Minimum Deposit Requirements:**\n" + min_deposit_info
-                ),
-                color=discord.Color.orange()
-            )
-
-            return await ctx.reply(embed=min_embed)  
-
-
         # Send loading embed in channel
         loading_embed = discord.Embed(
-            title="Generating Deposit...",
+            title="<a:Loading:1344251279773405185>| Generating Deposit...",
             description="Please wait while we fetch your deposit details.",
             color=discord.Color.gold()
         )
         loading_message = await ctx.reply(embed=loading_embed)
 
-        # Get conversion rate from USD -> Crypto
+        # Get conversion rate from USD -> Crypto for the user's deposit amount
         converted_amount = self.get_conversion_rate(self.supported_currencies[currency], amount)
-        if converted_amount is None:
+
+        # Check if the API returned an error dict indicating the amount is too low
+        if isinstance(converted_amount, dict) and converted_amount.get("error") == "amount_too_low":
+            # The API error returns the minimum deposit in usdcalgo
+            min_deposit_usdcalgo = converted_amount["min"]
+            # Convert 1 usdcalgo to USD. This gives you the live USD value of one usdcalgo.
+            usd_value = self.get_usdcalgo_to_usd(1)
+            if usd_value:
+                min_deposit_usd = min_deposit_usdcalgo * usd_value
+            else:
+                min_deposit_usd = min_deposit_usdcalgo  # Fallback if conversion fails
+            # Round to 8 decimal places
+            min_deposit_usd = round(min_deposit_usd, 8)
             await loading_message.delete()
-            return await ctx.reply(
-                embed=discord.Embed(
-                    title=":x: Conversion Error",
-                    description="Failed to fetch conversion rate. Try again later.",
-                    color=0xFF0000
-                )
-            )
+            return await ctx.reply(embed=discord.Embed(
+                title=":warning: Amount Too Low",
+                description=(
+                    f"The minimum deposit for **{currency}** is **{min_deposit_usd:.8f} USD**.\n"
+                    "Please increase your deposit amount and try again."
+                ),
+                color=discord.Color.orange()
+            ))
 
         # Create exchange and get deposit info
         deposit_data = self.get_deposit_data(self.supported_currencies[currency], amount)
@@ -244,18 +276,19 @@ class Deposit(commands.Cog):
             await loading_message.delete()
             return await ctx.reply(
                 embed=discord.Embed(
-                    title=":x: Deposit Error",
+                    title="<:no:1344252518305234987> | Deposit Error",
                     description="Failed to fetch deposit address. Try again later.",
                     color=0xFF0000
                 )
             )
         deposit_address = deposit_data.get("address_from")
-        if not deposit_address:
+        order_id = deposit_data.get("id")  # Capture the order ID from SimpleSwap
+        if not deposit_address or not order_id:
             await loading_message.delete()
             return await ctx.reply(
                 embed=discord.Embed(
-                    title=":x: Deposit Error",
-                    description="No deposit address received. Contact support.",
+                    title="<:no:1344252518305234987> | Deposit Error",
+                    description="No deposit address or order ID received. Contact support.",
                     color=0xFF0000
                 )
             )
@@ -266,7 +299,7 @@ class Deposit(commands.Cog):
         qr.save(img_buf, format='PNG')
         img_buf.seek(0)
         image = Image.open(img_buf)
-        #image = image.resize((1024, 1024))
+        # image = image.resize((1024, 1024))
         font = ImageFont.truetype("roboto.ttf", 22)
         font2 = ImageFont.truetype(font="roboto.ttf", size=18)
         draw = ImageDraw.Draw(image)
@@ -277,24 +310,51 @@ class Deposit(commands.Cog):
             image_binary.seek(0)
             file = discord.File(image_binary, filename="qrcode.png")
 
+        # Calculate tokens to be received based on the deposit USD amount
+        # (1 token = 0.0212 USD)
+        tokens_to_be_received = amount / 0.0212
+
         # Build the deposit embed to be sent via DM
         expiration_timestamp = int(time.time() + self.deposit_timeout)
         deposit_embed = discord.Embed(
-            title=":moneybag: DEPOSIT",
+            title=":moneybag: Deposit Instructions",
             description=(
-                f"**Send {converted_amount:.6f} {currency}** to the address below:\n"
-                f"```{deposit_address}```"
+                "Follow the steps below to complete your deposit. Please read the **Important** note at the bottom."
             ),
-            color=0x00FF00
+            color=0x1ABC9C  # A polished teal color
+        )
+        deposit_embed.add_field(
+            name="Deposit Amount",
+            value=f"Send **{converted_amount:.6f} {currency}**",
+            inline=False
+        )
+        deposit_embed.add_field(
+            name="Deposit Address",
+            value=f"```{deposit_address}```",
+            inline=False
+        )
+        deposit_embed.add_field(
+            name="Tokens to be Received",
+            value=f"**{tokens_to_be_received:.2f} tokens**",
+            inline=False
         )
         deposit_embed.add_field(
             name="Expires",
             value=f"<t:{expiration_timestamp}:R>",
-            inline=False
+            inline=True
         )
         deposit_embed.add_field(
             name="Instructions",
-            value="Please wait 2-3 minutes after sending. Your balance will update automatically.",
+            value="After sending, please wait 2-3 minutes. Your balance will update automatically.",
+            inline=True
+        )
+        deposit_embed.add_field(
+            name="Important",
+            value=(
+                ":warning: **Note:** Minimum deposit requirements may change at any time. "
+                "If you send less than the updated minimum, you may need to contact support using `!support` to get your funds returned. "
+                "To avoid issues, we recommend sending a few cents more than the displayed minimum."
+            ),
             inline=False
         )
         deposit_embed.set_image(url="attachment://qrcode.png")
@@ -309,7 +369,7 @@ class Deposit(commands.Cog):
             await dm_channel.send(embed=deposit_embed, file=file, view=view)
             await loading_message.delete()
             success_embed = discord.Embed(
-                title=":white_check_mark: Deposit Details Sent!",
+                title="<:checkmark:1344252974188335206> | Deposit Details Sent!",
                 description="Check your DMs for the deposit details.",
                 color=discord.Color.green()
             )
@@ -324,21 +384,73 @@ class Deposit(commands.Cog):
                 )
             )
 
-        # Mark the deposit as pending
-        #await self.loading_msg.delete()
+        # Mark the deposit as pending (store order_id and original USD amount)
         self.pending_deposits[ctx.author.id] = {
             "address": deposit_address,
             "amount": converted_amount,
-            "currency": currency
+            "currency": currency,
+            "order_id": order_id,
+            "usd_amount": amount,           # Original deposit amount in USD
+            "tokens": tokens_to_be_received  # Tokens to be credited
         }
 
-        # Wait for the deposit timeout; if still pending, auto-cancel
-        await asyncio.sleep(self.deposit_timeout)
+        # Launch the background task for live payment tracking
+        # Pass the original USD amount for token calculation
+        self.bot.loop.create_task(
+            self.track_payment(ctx, order_id, converted_amount, currency, amount)
+        )
+
+    def process_deposit(self, user_id, tokens_amount):
+        """Updates the user's balance when a deposit is successful."""
+        db = Users()
+        resp = db.update_balance(user_id, tokens_amount, "tokens", "$inc")
+        user = self.bot.get_user(user_id)
+        if user:
+            embed = discord.Embed(
+                title=":moneybag: Deposit Successful!",
+                description=f"You have received **{tokens_amount:.2f} tokens** in your balance.",
+                color=0x00FF00
+            )
+            return user.send(embed=embed)
+
+    async def track_payment(self, ctx, order_id, expected_amount, currency, usd_amount):
+        """
+        Monitors the deposit payment.
+        - expected_amount: The crypto amount expected.
+        - usd_amount: The original deposit amount in USD.
+        """
+        start_time = time.time()
+        poll_interval = 15  # seconds between each check
+
+        while time.time() - start_time < self.deposit_timeout:
+            payment_status = self.check_payment(order_id)
+            if payment_status["received"]:
+                received_amount = payment_status["amount"]
+                if received_amount >= expected_amount:
+                    # Calculate tokens based on the original deposit USD amount
+                    tokens_to_be_received = usd_amount / 0.0212
+                    await ctx.author.send(
+                        f"<:checkmark:1344252974188335206> | Full payment of **{received_amount:.6f} {currency}** received! "
+                        f"Processing your deposit... You will receive **{tokens_to_be_received:.2f} tokens**."
+                    )
+                    self.process_deposit(ctx.author.id, tokens_to_be_received)
+                    self.pending_deposits.pop(ctx.author.id, None)
+                    return
+                else:
+                    # Optionally re-fetch the current minimum deposit for this currency
+                    current_minimum = self.get_minimum_deposit(currency)
+                    message = f":warning: Partial payment detected. You sent **{received_amount:.6f} {currency}** but **{expected_amount:.6f} {currency}** is required."
+                    if current_minimum and current_minimum > expected_amount:
+                        message += f" The minimum has increased to **{current_minimum:.6f} {currency}** during your payment."
+                    message += " Please send the remaining amount to complete your deposit or contact support for a refund."
+                    await ctx.author.send(message)
+            await asyncio.sleep(poll_interval)
+
         if ctx.author.id in self.pending_deposits:
             cancel_embed = discord.Embed(
-                title="❌ DEPOSIT CANCELLED",
+                title="<:no:1344252518305234987> | DEPOSIT CANCELLED",
                 description=(
-                    "The deposit timer has expired and no transaction was detected.\n"
+                    "The deposit timer has expired and no full transaction was detected.\n"
                     "If you'd like to try again, use `!dep <currency> <amount>`."
                 ),
                 color=discord.Color.red()
@@ -347,27 +459,32 @@ class Deposit(commands.Cog):
                 await ctx.author.send(embed=cancel_embed)
             except discord.Forbidden:
                 pass
-            del self.pending_deposits[ctx.author.id]
+            self.pending_deposits.pop(ctx.author.id, None)
 
-    def process_deposit(self, user_id, amount):
-        """Updates the user's balance when a deposit is successful."""
-        Users().update_balance(user_id, amount, "tokens")
-        user = self.bot.get_user(user_id)
-        if user:
-            embed = discord.Embed(
-                title=":moneybag: Deposit Successful!",
-                description=f"You have received **{amount} tokens** in your balance.",
-                color=0x00FF00
-            )
-            return user.send(embed=embed)
+    def check_payment(self, order_id):
+        """
+        Check the payment status for the given SimpleSwap order ID.
+        Returns a dict: {"received": bool, "amount": float}
+        """
+        url = f"https://api.simpleswap.io/v1/get_status?api_key={self.api_key}&id={order_id}"
+        try:
+            response = requests.get(url)
+            data = response.json()
+            # Example: SimpleSwap might return a status like "completed" or "partial"
+            if data.get("status") in ["completed", "partial"]:
+                received_amount = float(data.get("received_amount", 0))
+                return {"received": True, "amount": received_amount}
+            else:
+                return {"received": False, "amount": 0.0}
+        except Exception as e:
+            print(f"[ERROR] Checking payment status: {e}")
+            return {"received": False, "amount": 0.0}
 
     @dep.before_invoke
     async def before(self, ctx):
         loading_emoji = emoji()["loading"]
-        #self.loading_msg = await ctx.reply(embed=discord.Embed(title=f"{loading_emoji} Running Your Command", description="`Please be paitient while we validate your credentials...`", color=discord.Color.green()))
         db = Users()
         if db.fetch_user(ctx.author.id) != False:
-        #await loading_msg.delete()
             pass
         else:
             print(f"{Fore.YELLOW}[~] {Fore.WHITE}New User Detected... {Fore.BLACK}{ctx.author.id}{Fore.WHITE} {Fore.YELLOW}")

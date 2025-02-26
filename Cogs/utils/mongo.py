@@ -28,5 +28,9 @@ class Users():
         else:
             return False
 
-    def update_balance(self, user_id, amount, currency: str = "tokens"):
-        return
+    def update_balance(self, user_id, amount, currency: str = "tokens", operation = "$set"):
+        try:
+            self.collection.update_one({"discord_id": user_id}, {operation: {currency: amount}})
+            return True
+        except Exception as e:
+            return False

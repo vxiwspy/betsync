@@ -47,7 +47,7 @@ class Fetches(commands.Cog):
         
         if not prices:
             embed = discord.Embed(
-                title=":x: API Error",
+                title="<:no:1344252518305234987> | API Error",
                 description="Could not retrieve live crypto prices. Please try again later.",
                 color=0xFF0000
             )
@@ -65,7 +65,7 @@ class Fetches(commands.Cog):
 
         if currency not in conversion_rates:
             embed = discord.Embed(
-                title=":x: Invalid Currency",
+                title="<:no:1344252518305234987> | Invalid Currency",
                 description=f"`{currency}` is not supported.\n\n"
                           ":pushpin: **Supported Currencies:**\n"
                           "`BTC, ETH, LTC, SOL, DOGE, USDT`",
@@ -109,7 +109,7 @@ class Fetches(commands.Cog):
         info = db.fetch_user(user_id)
         if info == False:
             embed = discord.Embed(
-                title=":x: User Not Registered", description="wait for autoregister to take place then use this command again", color=0xFF0000)
+                title="<:no:1344252518305234987> | User Not Registered", description="wait for autoregister to take place then use this command again", color=0xFF0000)
             embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar)
             return await ctx.message.reply(embed=embed)
         else:

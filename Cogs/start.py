@@ -17,7 +17,7 @@ class MainView(discord.ui.View):
 
         if response is False:
             embed = discord.Embed(
-                title=":x: **User Already Has An Account.**",
+                title="<:no:1344252518305234987> | **User Already Has An Account.**",
                 color=0xFF0000,
                 description="- **You Are Already Registered In Our Database.**"
             )
