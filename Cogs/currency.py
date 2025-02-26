@@ -61,9 +61,9 @@ class DepositCancelView(discord.ui.View):
                 ctx = await self.cog.bot.get_context(dummy_message)
                 # Reset the cooldown by clearing the cache
                 if cmd._buckets._cooldown:
-                    bucket = cmd._buckets._get_bucket(ctx.message)
+                    bucket = cmd._buckets.get_bucket(ctx.message)
                     if bucket:
-                        bucket._tokens = bucket._max
+                        bucket.reset()
 
             # Disable buttons and update message
             for child in self.children:
