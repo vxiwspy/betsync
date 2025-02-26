@@ -39,30 +39,33 @@ class DepositCancelView(discord.ui.View):
             # Reset the cooldown by getting the command and all its cooldowns
             cmd = self.cog.bot.get_command('dep')
             if cmd:
-                # Get all cooldowns for this command
-                cooldowns = cmd._buckets._cooldown
-                if cooldowns:
-                    # Create context for cooldown reset
-                    dummy_message = discord.Message(state=interaction.message._state, channel=interaction.channel, data={
-                'id': 0,
-                'content': '!dep',
-                'attachments': [],
-                'embeds': [],
-                'mention_everyone': False,
-                'tts': False,
-                'type': 0,
-                'pinned': False,
-                'edited_timestamp': None,
-                'author': {'id': interaction.user.id},
-                'timestamp': '2024-01-01T00:00:00+00:00'
-            })
-                    dummy_message.author = interaction.user
-                    ctx = await self.cog.bot.get_context(dummy_message)
-                    # Reset all cooldowns for this user
-                    cmd._buckets.reset(ctx)
-            # Disable all buttons in the view
+                # Create a minimal dummy context for cooldown reset
+                dummy_message = discord.Message(
+                    state=interaction.message._state, 
+                    channel=interaction.channel, 
+                    data={
+                        'id': 0,
+                        'content': '!dep',
+                        'attachments': [],
+                        'embeds': [],
+                        'mention_everyone': False,
+                        'tts': False,
+                        'type': 0,
+                        'pinned': False,
+                        'edited_timestamp': None,
+                        'author': {'id': interaction.user.id},
+                        'timestamp': '2024-01-01T00:00:00+00:00'
+                    }
+                )
+                dummy_message.author = interaction.user
+                ctx = await self.cog.bot.get_context(dummy_message)
+                # Reset the cooldown directly
+                cmd._buckets._cooldown.reset()
+                
+            # Disable buttons and update message
             for child in self.children:
                 child.disabled = True
+            await interaction.message.edit(view=self)
             await interaction.message.edit(view=self)
             cancel_embed = discord.Embed(
                 title="<:no:1344252518305234987> | DEPOSIT CANCELLED",
@@ -474,19 +477,18 @@ class Deposit(commands.Cog):
             dm_channel = ctx.author.dm_channel or await ctx.author.create_dm()
             await dm_channel.send(embed=deposit_embed, file=file, view=view)
             await loading_message.delete()
-            wait_embed = discord.Embed(
-                title="⏳ | Processing Deposit",
-                description="Please wait while we process your deposit...",
-                color=discord.Color.gold()
-            )
-            wait_msg = await ctx.reply(embed=wait_embed)
-            
+            # Send success message
             success_embed = discord.Embed(
                 title="<:checkmark:1344252974188335206> | Deposit Details Sent!",
                 description="Check your DMs for the deposit details.",
                 color=discord.Color.green()
             )
-            await wait_msg.edit(embed=success_embed, delete_after=10)
+            await ctx.reply(embed=success_embed, delete_after=10)
+            
+            # Start tracking the payment
+            self.bot.loop.create_task(
+                self.track_payment(ctx, order_id, converted_amount, currency, amount)
+            )
         except discord.Forbidden:
             await loading_message.delete()
             return await ctx.reply(
