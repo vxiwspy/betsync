@@ -61,12 +61,16 @@ class DepositCancelView(discord.ui.View):
                 ctx = await self.cog.bot.get_context(dummy_message)
                 # Reset the cooldown directly
                 cmd._buckets._cooldown.reset()
-                
+
             # Disable buttons and update message
             for child in self.children:
                 child.disabled = True
             await interaction.message.edit(view=self)
-            await interaction.message.edit(view=self)
+
+            # Reset pending deposit
+            if self.user_id in self.cog.pending_deposits:
+                del self.cog.pending_deposits[self.user_id]
+
             cancel_embed = discord.Embed(
                 title="<:no:1344252518305234987> | DEPOSIT CANCELLED",
                 description="Your deposit has been cancelled.\nYou can now use `!dep` to create a new deposit.",
@@ -484,7 +488,7 @@ class Deposit(commands.Cog):
                 color=discord.Color.green()
             )
             await ctx.reply(embed=success_embed, delete_after=10)
-            
+
             # Start tracking the payment
             self.bot.loop.create_task(
                 self.track_payment(ctx, order_id, converted_amount, currency, amount)
