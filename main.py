@@ -17,21 +17,26 @@ async def on_command_error(ctx, command):
     print(f"{Fore.RED}[-] {Fore.WHITE} Some monkey {Fore.BLACK}{ctx.message.author}{Fore.WHITE} tried to use a non existsent command 💔💔💔")
 
 @bot.event
-async def on_command(ctx): 
+async def on_command(ctx):
+    if ctx.command.is_on_cooldown(ctx):
+        return
+
     db = Users()
     if db.fetch_user(ctx.author.id) != False:
-        #await loading_msg.delete()
         return
-    else:
-        print(f"{Fore.YELLOW}[~] {Fore.WHITE}New User Detected... {Fore.BLACK}{ctx.author.id}{Fore.WHITE} {Fore.YELLOW}")
-        dump = {"discord_id": ctx.author.id, "tokens": 0, "credits": 0, "history": [], "total_deposit_amount": 0, "total_withdraw_amount": 0, "total_spent": 0, "total_earned": 0, 'total_played': 0, 'total_won': 0, 'total_lost':0}
-        db.register_new_user(dump)
-        info = db.fetch_user(ctx.author.id)
-        print(f"{Fore.GREEN}[+] {Fore.WHITE}New User Registered... {Fore.BLACK}{ctx.author.id}{Fore.WHITE} {Fore.GREEN}{info}{Fore.WHITE}")
-        embed = discord.Embed(title=":wave: Welcome to BetSync Casino!", color=0x00FFAE, description="**Type** `!guide` **to get started**")
-        embed.set_footer(text="BetSync Casino", icon_url=bot.user.avatar.url)
-        #await loading_msg.delete()
-        await ctx.reply("By using BetSync, agree to our TOS. Type `!tos` to know more.", embed=embed)
+
+    dump = {"discord_id": ctx.author.id, "tokens": 0, "credits": 0, "history": [], "total_deposit_amount": 0, "total_withdraw_amount": 0, "total_spent": 0, "total_earned": 0, 'total_played': 0, 'total_won': 0, 'total_lost':0}
+    db.register_new_user(dump)
+
+    embed = discord.Embed(title=":wave: Welcome to BetSync Casino!", color=0x00FFAE, description="**Type** `!guide` **to get started**")
+    embed.set_footer(text="BetSync Casino", icon_url=bot.user.avatar.url)
+    await ctx.reply("By using BetSync, agree to our TOS. Type `!tos` to know more.", embed=embed)
+
+# Add default cooldown to all commands
+@bot.event 
+async def on_command_registration(command):
+    if not command.cooldown:
+        command.cooldown = commands.Cooldown(1, 3.0, commands.BucketType.user)
 
 @bot.event
 async def on_ready():
