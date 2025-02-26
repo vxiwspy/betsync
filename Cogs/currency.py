@@ -336,10 +336,7 @@ class Deposit(commands.Cog):
         img_buf = io.BytesIO()
         background.save(img_buf, format='PNG')
         img_buf.seek(0)
-        with io.BytesIO() as image_binary:
-            image.save(image_binary, 'PNG')
-            image_binary.seek(0)
-            file = discord.File(image_binary, filename="qrcode.png")
+        file = discord.File(img_buf, filename="qrcode.png")
 
         # Calculate tokens to be received based on the deposit USD amount
         # (1 token = 0.0212 USD)
