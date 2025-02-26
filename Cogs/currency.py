@@ -211,6 +211,15 @@ class Deposit(commands.Cog):
             print(f"[ERROR] Non-JSON response: {response.text}")
             return None
 
+    async def dep_error(self, ctx, error):
+        if isinstance(error, commands.CommandOnCooldown):
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Please Wait",
+                description=f"Please wait {int(error.retry_after)} seconds before depositing again or click the cancel button.",
+                color=discord.Color.red()
+            )
+            await ctx.reply(embed=embed)
+
     @commands.command(aliases=["depo"])
     @commands.cooldown(1, 600, commands.BucketType.user)  # 10 minute cooldown
     async def dep(self, ctx, currency: str = None, amount: float = None):
