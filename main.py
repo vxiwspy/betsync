@@ -40,25 +40,9 @@ async def on_command(ctx):
     embed.set_footer(text="BetSync Casino", icon_url=bot.user.avatar.url)
     await ctx.reply("By using BetSync, agree to our TOS. Type `!tos` to know more.", embed=embed)
 
-# Add global cooldown to all commands
+# Handle user registration on command
 @bot.event
 async def on_command(ctx):
-    # Skip cooldown check for deposit command
-    if ctx.command and ctx.command.name != "dep":
-        if ctx.command.is_on_cooldown(ctx):
-            return
-        cooldown = commands.Cooldown(1, 4.0, commands.BucketType.user)  # 4 second global cooldown
-        bucket = cooldown._get_bucket(ctx)
-        retry_after = bucket.update_rate_limit()
-        if retry_after:
-            embed = discord.Embed(
-                title="<:no:1344252518305234987> | Slow Down!",
-                description=f"You must wait **{retry_after:.1f}** seconds before using another command.",
-                color=discord.Color.red()
-            )
-            await ctx.reply(embed=embed, delete_after=5)
-            raise commands.CommandOnCooldown(cooldown, retry_after, commands.BucketType.user)
-            
     # Continue with user registration check
     db = Users()
     if db.fetch_user(ctx.author.id) != False:
