@@ -59,8 +59,10 @@ class DepositCancelView(discord.ui.View):
                 )
                 dummy_message.author = interaction.user
                 ctx = await self.cog.bot.get_context(dummy_message)
-                # Reset the cooldown directly
-                cmd._buckets._cooldown.reset()
+                # Reset the cooldown for the specific user
+                if cmd._buckets._cooldown:
+                    cmd._buckets._cooldown.update_rate_limit(dummy_message)
+                    cmd._buckets._cooldown._cache.pop(ctx.author.id, None)
 
             # Disable buttons and update message
             for child in self.children:
