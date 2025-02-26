@@ -17,7 +17,7 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandOnCooldown):
         embed = discord.Embed(
             title="<:no:1344252518305234987> | Slow Down!",
-            description=f"Please wait **{error.retry_after:.1f}** seconds before using another command.",
+            description=f"You must wait **{error.retry_after:.1f}** seconds before using another command.",
             color=discord.Color.red()
         )
         await ctx.reply(embed=embed, delete_after=5)

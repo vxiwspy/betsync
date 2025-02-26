@@ -212,7 +212,7 @@ class Deposit(commands.Cog):
         if ctx.author.id in self.pending_deposits:
             embed = discord.Embed(
                 title="<:no:1344252518305234987> | Active Deposit",
-                description="You already have a pending deposit. Please wait for it to expire or use the cancel button.",
+                description="Please wait 600 seconds before depositing again or cancel manually via the cancel button.",
                 color=discord.Color.red()
             )
             return await ctx.reply(embed=embed)
