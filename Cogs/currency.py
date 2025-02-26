@@ -205,11 +205,11 @@ class Deposit(commands.Cog):
         Deposit command: !dep <currency> <amount in USD>
         Example: !dep BTC 50
         """
-        # Send initial loading message immediately
+        # Send loading embed in channel
         loading_embed = discord.Embed(
-            title="<a:Loading:1344251279773405185> Processing",
-            description="Generating deposit details...",
-            color=0x2B2D31
+            title="<a:Loading:1344251279773405185> | Generating Deposit...",
+            description="Please wait while we fetch your deposit details.",
+            color=discord.Color.gold()
         )
         loading_message = await ctx.reply(embed=loading_embed)
 
@@ -217,7 +217,7 @@ class Deposit(commands.Cog):
         if ctx.author.id in self.pending_deposits:
             await loading_message.delete()
             embed = discord.Embed(
-                title="<:no:1344252518305234987> Active Deposit",
+                title="<:no:1344252518305234987> | Active Deposit",
                 description="You have a pending deposit. Please wait for it to expire or cancel it.",
                 color=discord.Color.red()
             )
@@ -246,13 +246,6 @@ class Deposit(commands.Cog):
                 )
             )
 
-        # Send loading embed in channel
-        loading_embed = discord.Embed(
-            title="<a:Loading:1344251279773405185>| Generating Deposit...",
-            description="Please wait while we fetch your deposit details.",
-            color=discord.Color.gold()
-        )
-        loading_message = await ctx.reply(embed=loading_embed)
 
         # Get conversion rate from USD -> Crypto for the user's deposit amount
         converted_amount = self.get_conversion_rate(self.supported_currencies[currency], amount)
@@ -313,7 +306,7 @@ class Deposit(commands.Cog):
         qr.add_data(qr_data)
         qr.make(fit=True)
         qr_img = qr.make_image(fill_color="black", back_color="white")
-        
+
         # Create a new background with gradient
         background = Image.new('RGBA', (500, 700), 'white')
         gradient = Image.new('RGBA', background.size, (0,0,0,0))
@@ -322,25 +315,25 @@ class Deposit(commands.Cog):
             alpha = int(255 * (1 - y/background.height))
             draw_gradient.line([(0,y), (background.width,y)], fill=(240,240,255,alpha))
         background = Image.alpha_composite(background.convert('RGBA'), gradient)
-        
+
         # Resize and optimize QR code
         qr_img = qr_img.resize((300, 300), Image.Resampling.LANCZOS)
-        
+
         # Calculate position to center QR code
         qr_x = (background.width - qr_img.width) // 2
         qr_y = 150
         background.paste(qr_img, (qr_x, qr_y))
-        
+
         # Add text with better fonts
         draw = ImageDraw.Draw(background)
         title_font = ImageFont.truetype("roboto.ttf", 36)
         detail_font = ImageFont.truetype("roboto.ttf", 24)
-        
+
         # Add text elements
         draw.text((300, 50), f"{ctx.author.name}'s Deposit QR", font=title_font, anchor="mm", fill="black")
         draw.text((300, qr_y + qr_img.height + 30), f"Amount: {converted_amount:.6f} {currency}", font=detail_font, anchor="mm", fill="black")
         draw.text((300, qr_y + qr_img.height + 70), "Scan to get address", font=detail_font, anchor="mm", fill="black")
-        
+
         # Add semi-transparent watermark
         watermark = "BETSYNC"
         watermark_font = ImageFont.truetype("roboto.ttf", 72)
@@ -348,10 +341,10 @@ class Deposit(commands.Cog):
         watermark_width = watermark_bbox[2] - watermark_bbox[0]
         watermark_x = (background.width - watermark_width) // 2
         watermark_y = 650
-        
+
         # Draw watermark with transparency
         draw.text((watermark_x, watermark_y), watermark, font=watermark_font, fill=(0, 0, 0, 64))
-        
+
         # Save to bytes
         img_buf = io.BytesIO()
         background.save(img_buf, format='PNG')
