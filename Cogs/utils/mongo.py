@@ -16,7 +16,7 @@ class Users:
 
     def __init__(self):
         if not hasattr(self, 'db'):
-            self.db = self._client["betsync"]
+            self.db = self._client["BetSync"]
             self.collection = self.db["users"]
 
     def get_all_users(self):
