@@ -59,7 +59,7 @@ class DepositCancelView(discord.ui.View):
                     dummy_message.author = interaction.user
                     ctx = await self.cog.bot.get_context(dummy_message)
                     # Reset all cooldowns for this user
-                    cmd._buckets.reset_cooldown(ctx)
+                    cmd._buckets.reset(ctx)
             # Disable all buttons in the view
             for child in self.children:
                 child.disabled = True
