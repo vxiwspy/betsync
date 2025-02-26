@@ -34,21 +34,22 @@ class DepositCancelView(discord.ui.View):
                 "You cannot cancel someone else's deposit.", ephemeral=True
             )
         # Get context and remove pending deposit if it exists
-        ctx = await self.cog.bot.get_context(interaction.message)
         if self.user_id in self.cog.pending_deposits:
             del self.cog.pending_deposits[self.user_id]
-            # Reset the cooldown for the deposit command
-            self.cog.dep.reset_cooldown(ctx)
+            # Reset the cooldown by getting the command and using get_command
+            cmd = self.cog.bot.get_command('dep')
+            if cmd:
+                cmd.reset_cooldown(await self.cog.bot.get_context(interaction.message))
             # Disable all buttons in the view
             for child in self.children:
                 child.disabled = True
-            await interaction.response.edit_message(view=self)
+            await interaction.message.edit(view=self)
             cancel_embed = discord.Embed(
                 title="<:no:1344252518305234987> | DEPOSIT CANCELLED",
                 description="Your deposit has been cancelled.\nYou can now use `!dep` to create a new deposit.",
                 color=discord.Color.red()
             )
-            await interaction.followup.send(embed=cancel_embed, ephemeral=True)
+            await interaction.response.send_message(embed=cancel_embed, ephemeral=True)
         else:
             retry_after = self.cog.dep.get_cooldown_retry_after(ctx)
             if retry_after:
