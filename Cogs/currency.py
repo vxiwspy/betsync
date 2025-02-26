@@ -205,11 +205,20 @@ class Deposit(commands.Cog):
         Deposit command: !dep <currency> <amount in USD>
         Example: !dep BTC 50
         """
+        # Send initial loading message immediately
+        loading_embed = discord.Embed(
+            title="<a:Loading:1344251279773405185> Processing",
+            description="Generating deposit details...",
+            color=0x2B2D31
+        )
+        loading_message = await ctx.reply(embed=loading_embed)
+
         # Prevent duplicate deposits
         if ctx.author.id in self.pending_deposits:
+            await loading_message.delete()
             embed = discord.Embed(
-                title="<:no:1344252518305234987> | Pending Deposit",
-                description="You already have a pending deposit. Please wait for it to expire or cancel it before starting a new one.",
+                title="<:no:1344252518305234987> Active Deposit",
+                description="You have a pending deposit. Please wait for it to expire or cancel it.",
                 color=discord.Color.red()
             )
             return await ctx.reply(embed=embed)
@@ -293,18 +302,29 @@ class Deposit(commands.Cog):
                 )
             )
 
-        # Generate QR Code with the deposit information
+        # Generate QR Code with optimized settings
         qr_data = f"Amount: {converted_amount:.6f} {currency}\nAddress: {deposit_address}"
-        qr = qrcode.QRCode(version=1, box_size=10, border=2)
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=8,
+            border=1
+        )
         qr.add_data(qr_data)
         qr.make(fit=True)
         qr_img = qr.make_image(fill_color="black", back_color="white")
         
-        # Create a new white background image
-        background = Image.new('RGBA', (600, 800), 'white')
+        # Create a new background with gradient
+        background = Image.new('RGBA', (500, 700), 'white')
+        gradient = Image.new('RGBA', background.size, (0,0,0,0))
+        draw_gradient = ImageDraw.Draw(gradient)
+        for y in range(background.height):
+            alpha = int(255 * (1 - y/background.height))
+            draw_gradient.line([(0,y), (background.width,y)], fill=(240,240,255,alpha))
+        background = Image.alpha_composite(background.convert('RGBA'), gradient)
         
-        # Resize QR code to be smaller
-        qr_img = qr_img.resize((400, 400))
+        # Resize and optimize QR code
+        qr_img = qr_img.resize((300, 300), Image.Resampling.LANCZOS)
         
         # Calculate position to center QR code
         qr_x = (background.width - qr_img.width) // 2
@@ -345,11 +365,14 @@ class Deposit(commands.Cog):
         # Build the deposit embed to be sent via DM
         expiration_timestamp = int(time.time() + self.deposit_timeout)
         deposit_embed = discord.Embed(
-            title=":moneybag: Deposit Instructions",
+            title="💎 Secure Deposit Gateway",
             description=(
-                "Follow the steps below to complete your deposit. Please read the **Important** note at the bottom."
+                "**Follow these steps to complete your deposit:**\n"
+                "1. Send the exact amount shown below\n"
+                "2. Wait for confirmation (2-3 minutes)\n"
+                "3. Your balance will update automatically"
             ),
-            color=0x1ABC9C  # A polished teal color
+            color=0x2B2D31
         )
         deposit_embed.add_field(
             name="Deposit Amount",
