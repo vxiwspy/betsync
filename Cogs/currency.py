@@ -241,10 +241,10 @@ class Deposit(commands.Cog):
 
     async def dep_error(self, ctx, error):
         if isinstance(error, commands.CommandOnCooldown):
-            retry_after = self.dep.get_cooldown_retry_after(ctx)
+            retry_after = int(error.retry_after)
             embed = discord.Embed(
                 title="<:no:1344252518305234987> | DEPOSIT COOLDOWN",
-                description=f"You cannot deposit until {int(retry_after)} seconds have passed or click the cancel button.",
+                description=f"You cannot deposit until {retry_after} seconds have passed.\nTry again <t:{int(time.time() + retry_after)}:R>",
                 color=discord.Color.red()
             )
             await ctx.reply(embed=embed)
