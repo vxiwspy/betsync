@@ -268,6 +268,14 @@ class Deposit(commands.Cog):
         Deposit command: !dep <currency> <amount in USD>
         Example: !dep BTC 50
         """
+        # Immediately send loading embed
+        loading_embed = discord.Embed(
+            title="<a:Loading:1344251279773405185> | Generating Deposit...",
+            description="Please wait while we fetch your deposit details.",
+            color=discord.Color.gold()
+        )
+        loading_message = await ctx.reply(embed=loading_embed)
+
         # Check for active deposit
         if ctx.author.id in self.pending_deposits:
             # Get remaining cooldown
@@ -277,15 +285,8 @@ class Deposit(commands.Cog):
                 description=f"Please wait {int(retry_after)} seconds before depositing again or cancel manually via the cancel button.",
                 color=discord.Color.red()
             )
+            await loading_message.delete()
             return await ctx.reply(embed=embed)
-
-        # Send loading embed in channel
-        loading_embed = discord.Embed(
-            title="<a:Loading:1344251279773405185> | Generating Deposit...",
-            description="Please wait while we fetch your deposit details.",
-            color=discord.Color.gold()
-        )
-        loading_message = await ctx.reply(embed=loading_embed)
 
         # Prevent duplicate deposits
         if ctx.author.id in self.pending_deposits:
