@@ -14,14 +14,7 @@ cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start" , "Cogs.currency"]
 
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandOnCooldown):
-        embed = discord.Embed(
-            title="<:no:1344252518305234987> | Slow Down!",
-            description=f"You must wait **{error.retry_after:.1f}** seconds before using another command.",
-            color=discord.Color.red()
-        )
-        await ctx.reply(embed=embed, delete_after=5)
-    elif isinstance(error, commands.CommandNotFound):
+    if isinstance(error, commands.CommandNotFound):
         print(f"{Fore.RED}[-] {Fore.WHITE} Some monkey {Fore.BLACK}{ctx.message.author}{Fore.WHITE} tried to use a non existsent command 💔💔💔")
 
 @bot.event
