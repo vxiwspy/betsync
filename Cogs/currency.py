@@ -33,22 +33,31 @@ class DepositCancelView(discord.ui.View):
             return await interaction.response.send_message(
                 "You cannot cancel someone else's deposit.", ephemeral=True
             )
-        # Remove pending deposit if it exists
+        # Get context and remove pending deposit if it exists
+        ctx = await self.cog.bot.get_context(interaction.message)
         if self.user_id in self.cog.pending_deposits:
             del self.cog.pending_deposits[self.user_id]
             # Reset the cooldown for the deposit command
-            ctx = await self.cog.bot.get_context(interaction.message)
             self.cog.dep.reset_cooldown(ctx)
-        # Disable all buttons in the view
-        for child in self.children:
-            child.disabled = True
-        await interaction.response.edit_message(view=self)
-        cancel_embed = discord.Embed(
-            title="<:no:1344252518305234987> | DEPOSIT CANCELLED",
-            description="Your deposit has been cancelled as per your request.\n\nIf you'd like to try again, use `!dep`.",
-            color=discord.Color.red()
-        )
-        await interaction.followup.send(embed=cancel_embed, ephemeral=True)
+            # Disable all buttons in the view
+            for child in self.children:
+                child.disabled = True
+            await interaction.response.edit_message(view=self)
+            cancel_embed = discord.Embed(
+                title="<:no:1344252518305234987> | DEPOSIT CANCELLED",
+                description="Your deposit has been cancelled.\nYou can now use `!dep` to create a new deposit.",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=cancel_embed, ephemeral=True)
+        else:
+            retry_after = self.cog.dep.get_cooldown_retry_after(ctx)
+            if retry_after:
+                embed = discord.Embed(
+                    title="<:no:1344252518305234987> | Cooldown Active",
+                    description=f"Please wait {int(retry_after)} seconds before depositing again or click the cancel button.",
+                    color=discord.Color.red()
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(label="Copy", style=discord.ButtonStyle.secondary)
     async def copy_button(self, button: discord.ui.Button, interaction: discord.Interaction):
