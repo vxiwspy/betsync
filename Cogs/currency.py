@@ -38,8 +38,9 @@ class DepositCancelView(discord.ui.View):
             del self.cog.pending_deposits[self.user_id]
             # Reset the cooldown by getting the command and using get_command
             cmd = self.cog.bot.get_command('dep')
+            ctx = await self.cog.bot.get_context(interaction.message)
             if cmd:
-                cmd.reset_cooldown(await self.cog.bot.get_context(interaction.message))
+                cmd.reset_cooldown(ctx)
             # Disable all buttons in the view
             for child in self.children:
                 child.disabled = True
@@ -51,8 +52,15 @@ class DepositCancelView(discord.ui.View):
             )
             await interaction.response.send_message(embed=cancel_embed, ephemeral=True)
         else:
+            ctx = await self.cog.bot.get_context(interaction.message)
             retry_after = self.cog.dep.get_cooldown_retry_after(ctx)
             if retry_after:
+                embed = discord.Embed(
+                    title="<:no:1344252518305234987> | DEPOSIT COOLDOWN",
+                    description=f"You cannot deposit until {int(retry_after)} seconds have passed or click the cancel button.",
+                    color=discord.Color.red()
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
                 embed = discord.Embed(
                     title="<:no:1344252518305234987> | Cooldown Active",
                     description=f"Please wait {int(retry_after)} seconds before depositing again or click the cancel button.",
@@ -215,8 +223,8 @@ class Deposit(commands.Cog):
     async def dep_error(self, ctx, error):
         if isinstance(error, commands.CommandOnCooldown):
             embed = discord.Embed(
-                title="<:no:1344252518305234987> | Please Wait",
-                description=f"Please wait {int(error.retry_after)} seconds before depositing again or click the cancel button.",
+                title="<:no:1344252518305234987> | DEPOSIT COOLDOWN",
+                description=f"You cannot deposit until {int(error.retry_after)} seconds have passed or click the cancel button.",
                 color=discord.Color.red()
             )
             await ctx.reply(embed=embed)
