@@ -210,9 +210,11 @@ class Deposit(commands.Cog):
         """
         # Check for active deposit
         if ctx.author.id in self.pending_deposits:
+            # Get remaining cooldown
+            retry_after = self.dep.get_cooldown_retry_after(ctx)
             embed = discord.Embed(
                 title="<:no:1344252518305234987> | Active Deposit",
-                description="Please wait 600 seconds before depositing again or cancel manually via the cancel button.",
+                description=f"Please wait {int(retry_after)} seconds before depositing again or cancel manually via the cancel button.",
                 color=discord.Color.red()
             )
             return await ctx.reply(embed=embed)

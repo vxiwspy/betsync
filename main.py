@@ -43,11 +43,18 @@ async def on_command(ctx):
 # Add global cooldown to all commands
 @bot.event
 async def on_command(ctx):
-    bucket = commands.Cooldown(1, 5.0, commands.BucketType.user)
-    retry_after = bucket.update_rate_limit()
-    if retry_after:
-        raise commands.CommandOnCooldown(bucket, retry_after, commands.BucketType.user)
-    
+    if ctx.command.name != "dep":  # Skip global cooldown for deposit command
+        bucket = commands.Cooldown(1, 5.0, commands.BucketType.user)
+        retry_after = bucket.update_rate_limit()
+        if retry_after:
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Slow Down!",
+                description=f"You must wait {int(retry_after)} seconds before using another command.",
+                color=discord.Color.red()
+            )
+            await ctx.reply(embed=embed, delete_after=5)
+            return
+            
     # Continue with user registration check
     db = Users()
     if db.fetch_user(ctx.author.id) != False:
