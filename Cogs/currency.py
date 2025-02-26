@@ -427,15 +427,20 @@ class Deposit(commands.Cog):
             if payment_status["received"]:
                 received_amount = payment_status["amount"]
                 if received_amount >= expected_amount:
-                    # Calculate tokens based on the original deposit USD amount
-                    tokens_to_be_received = usd_amount / 0.0212
-                    await ctx.author.send(
-                        f"<:checkmark:1344252974188335206> | Full payment of **{received_amount:.6f} {currency}** received! "
-                        f"Processing your deposit... You will receive **{tokens_to_be_received:.2f} tokens**."
-                    )
-                    self.process_deposit(ctx.author.id, tokens_to_be_received)
-                    self.pending_deposits.pop(ctx.author.id, None)
-                    return
+                    try:
+                        # Calculate tokens based on the original deposit USD amount
+                        tokens_to_be_received = usd_amount / 0.0212
+                        await ctx.author.send(
+                            f"<:checkmark:1344252974188335206> | Full payment of **{received_amount:.6f} {currency}** received! "
+                            f"Processing your deposit... You will receive **{tokens_to_be_received:.2f} tokens**."
+                        )
+                        self.process_deposit(ctx.author.id, tokens_to_be_received)
+                        self.pending_deposits.pop(ctx.author.id, None)
+                        return
+                    except Exception as e:
+                        print(f"[ERROR] Processing deposit: {e}")
+                        await ctx.author.send("There was an error processing your deposit. Please contact support.")
+                        return
                 else:
                     # Optionally re-fetch the current minimum deposit for this currency
                     current_minimum = self.get_minimum_deposit(currency)
