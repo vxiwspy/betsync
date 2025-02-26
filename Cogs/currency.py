@@ -246,12 +246,14 @@ class Deposit(commands.Cog):
             print(f"[ERROR] Non-JSON response: {response.text}")
             return None
 
-    async def dep_error(self, ctx, error):
-        if isinstance(error, commands.CommandOnCooldown):
+    @commands.Cog.listener()
+    async def on_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandOnCooldown) and ctx.command.name in ['dep', 'depo']:
             retry_after = int(error.retry_after)
+            current_time = int(time.time())
             embed = discord.Embed(
                 title="<:no:1344252518305234987> | DEPOSIT COOLDOWN",
-                description=f"You cannot deposit until {retry_after} seconds have passed.\nTry again <t:{int(time.time() + retry_after)}:R>",
+                description=f"You're on cooldown!\nPlease wait **{retry_after}** seconds.\nTry again <t:{current_time + retry_after}:R>",
                 color=discord.Color.red()
             )
             await ctx.reply(embed=embed)
