@@ -200,6 +200,7 @@ class Deposit(commands.Cog):
             return None
 
     @commands.command(aliases=["depo"])
+    @commands.cooldown(1, 600, commands.BucketType.user)  # 10 minute cooldown
     async def dep(self, ctx, currency: str = None, amount: float = None):
         """
         Deposit command: !dep <currency> <amount in USD>
