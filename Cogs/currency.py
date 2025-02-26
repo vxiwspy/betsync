@@ -308,7 +308,7 @@ class Deposit(commands.Cog):
         qr_img = qr.make_image(fill_color="black", back_color="white")
 
         # Create a new background with gradient
-        background = Image.new('RGBA', (500, 700), 'white')
+        background = Image.new('RGBA', (500, 600), 'white')  # Reduced height
         gradient = Image.new('RGBA', background.size, (0,0,0,0))
         draw_gradient = ImageDraw.Draw(gradient)
         for y in range(background.height):
@@ -317,11 +317,11 @@ class Deposit(commands.Cog):
         background = Image.alpha_composite(background.convert('RGBA'), gradient)
 
         # Resize and optimize QR code
-        qr_img = qr_img.resize((300, 300), Image.Resampling.LANCZOS)
+        qr_img = qr_img.resize((280, 280), Image.Resampling.LANCZOS)  # Slightly smaller QR
 
         # Calculate position to center QR code
         qr_x = (background.width - qr_img.width) // 2
-        qr_y = 150
+        qr_y = 120  # Moved up
         background.paste(qr_img, (qr_x, qr_y))
 
         # Add text with better fonts
@@ -329,18 +329,18 @@ class Deposit(commands.Cog):
         title_font = ImageFont.truetype("roboto.ttf", 36)
         detail_font = ImageFont.truetype("roboto.ttf", 24)
 
-        # Add text elements
-        draw.text((300, 50), f"{ctx.author.name}'s Deposit QR", font=title_font, anchor="mm", fill="black")
-        draw.text((300, qr_y + qr_img.height + 30), f"Amount: {converted_amount:.6f} {currency}", font=detail_font, anchor="mm", fill="black")
-        draw.text((300, qr_y + qr_img.height + 70), "Scan to get address", font=detail_font, anchor="mm", fill="black")
+        # Add text elements with adjusted spacing
+        draw.text((250, 50), f"{ctx.author.name}'s Deposit QR", font=title_font, anchor="mm", fill="black")
+        draw.text((250, qr_y + qr_img.height + 20), f"Amount: {converted_amount:.6f} {currency}", font=detail_font, anchor="mm", fill="black")
+        draw.text((250, qr_y + qr_img.height + 50), "Scan to get address", font=detail_font, anchor="mm", fill="black")
 
         # Add semi-transparent watermark
         watermark = "BETSYNC"
-        watermark_font = ImageFont.truetype("roboto.ttf", 72)
+        watermark_font = ImageFont.truetype("roboto.ttf", 60)  # Smaller font
         watermark_bbox = draw.textbbox((0, 0), watermark, font=watermark_font)
         watermark_width = watermark_bbox[2] - watermark_bbox[0]
         watermark_x = (background.width - watermark_width) // 2
-        watermark_y = 650
+        watermark_y = 520  # Adjusted position
 
         # Draw watermark with transparency
         draw.text((watermark_x, watermark_y), watermark, font=watermark_font, fill=(0, 0, 0, 64))
