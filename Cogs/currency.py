@@ -346,49 +346,6 @@ class Deposit(commands.Cog):
             print(f"[TIMING-DEPOSIT] SimpleSwap API request took {end_time - start_time:.2f} seconds")
             print(f"[DEBUG-DEPOSIT] === DEPOSIT PROCESS COMPLETED ===\n")
 
-    def test_api_connection(self):
-        """
-        Test the SimpleSwap API connection with a minimal request to diagnose issues.
-        """
-        print(f"[DEBUG-TEST] Testing SimpleSwap API connection...")
-        test_url = f"https://api.simpleswap.io/v1/get_all_currencies?api_key={self.api_key}"
-        
-        try:
-            response = requests.get(test_url, timeout=10)
-            print(f"[DEBUG-TEST] Test API status code: {response.status_code}")
-            
-            if response.status_code == 200:
-                print(f"[DEBUG-TEST] API connection successful")
-                try:
-                    data = response.json()
-                    if isinstance(data, list) and len(data) > 0:
-                        print(f"[DEBUG-TEST] API returned a list of {len(data)} currencies")
-                    else:
-                        print(f"[DEBUG-TEST] API returned unexpected data format: {data}")
-                except Exception as e:
-                    print(f"[DEBUG-TEST] Cannot parse API response: {str(e)}")
-            else:
-                print(f"[ERROR-TEST] API test failed with status code {response.status_code}: {response.text}")
-                
-            # Check specific currency support
-            if self.target_currency == "usdcalgo":
-                print(f"[DEBUG-TEST] Checking if target currency '{self.target_currency}' is supported...")
-                currency_check_url = f"https://api.simpleswap.io/v1/get_pairs?api_key={self.api_key}&fixed=false&currency_from=btc"
-                currency_response = requests.get(currency_check_url, timeout=10)
-                
-                if currency_response.status_code == 200:
-                    pairs = currency_response.json()
-                    if self.target_currency in pairs:
-                        print(f"[DEBUG-TEST] Target currency '{self.target_currency}' is supported")
-                    else:
-                        print(f"[ERROR-TEST] Target currency '{self.target_currency}' is NOT in the supported pairs list")
-                        print(f"[DEBUG-TEST] First 10 supported pairs: {pairs[:10]}")
-                else:
-                    print(f"[ERROR-TEST] Could not check currency pairs: {currency_response.status_code}")
-            
-        except Exception as e:
-            print(f"[ERROR-TEST] API test failed with exception: {str(e)}")
-
     # Cooldown is now handled directly in the command
     # This listener is no longer needed as we apply cooldown manually
 
