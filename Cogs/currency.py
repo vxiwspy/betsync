@@ -131,8 +131,8 @@ class DepositCancelView(discord.ui.View):
 class Deposit(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.target_currency = "usdc"  # Target currency for deposits (changed from usdcalgo to usdc)
-        self.api_key = "d676247c-fbc2-4490-9fbf-e0e60a4e2066"  # SimpleSwap API key
+        self.target_currency = "usdcalgo"
+        self.api_key = "d676247c-fbc2-4490-9fbf-e0e60a4e2066"
         self.supported_currencies = {
             "BTC": "btc",
             "LTC": "ltc",
@@ -142,10 +142,6 @@ class Deposit(commands.Cog):
         }
         self.pending_deposits = {}
         self.deposit_timeout = 600  # 10 minutes
-        
-        # Test the API connection on initialization
-        print("[INIT] Testing SimpleSwap API connection on startup")
-        self.test_api_connection()
 
     def get_crypto_prices(self):
         url = "https://api.coingecko.com/api/v3/simple/price"
@@ -229,74 +225,11 @@ class Deposit(commands.Cog):
             print(f"[ERROR] Unable to fetch minimum deposit: {e}")
             return None
 
-    def test_api_connection(self):
-        """
-        Test the SimpleSwap API connection with a minimal request to diagnose issues.
-        """
-        print(f"[DEBUG-TEST] Testing SimpleSwap API connection...")
-        test_url = f"https://api.simpleswap.io/v1/get_all_currencies?api_key={self.api_key}"
-        
-        try:
-            response = requests.get(test_url, timeout=10)
-            print(f"[DEBUG-TEST] Test API status code: {response.status_code}")
-            
-            if response.status_code == 200:
-                print(f"[DEBUG-TEST] API connection successful")
-                try:
-                    data = response.json()
-                    if isinstance(data, list) and len(data) > 0:
-                        print(f"[DEBUG-TEST] API returned a list of {len(data)} currencies")
-                        # Verify our target currency is in the list
-                        if self.target_currency in data:
-                            print(f"[DEBUG-TEST] Target currency '{self.target_currency}' is supported")
-                        else:
-                            print(f"[ERROR-TEST] Target currency '{self.target_currency}' is NOT in the supported currencies list!")
-                            # Try to find some alternative stable coins
-                            stablecoins = [c for c in data if 'usd' in c.lower()][:5]
-                            if stablecoins:
-                                print(f"[DEBUG-TEST] Available stablecoins: {stablecoins}")
-                    else:
-                        print(f"[DEBUG-TEST] API returned unexpected data format: {data}")
-                except Exception as e:
-                    print(f"[DEBUG-TEST] Cannot parse API response: {str(e)}")
-            else:
-                print(f"[ERROR-TEST] API test failed with status code {response.status_code}: {response.text}")
-                
-            # Check if our supported currencies are valid
-            print(f"[DEBUG-TEST] Checking supported currencies...")
-            for currency_code in self.supported_currencies.values():
-                currency_check_url = f"https://api.simpleswap.io/v1/get_pairs?api_key={self.api_key}&fixed=false&currency_from={currency_code}"
-                try:
-                    currency_response = requests.get(currency_check_url, timeout=10)
-                    if currency_response.status_code == 200:
-                        pairs = currency_response.json()
-                        if self.target_currency in pairs:
-                            print(f"[DEBUG-TEST] '{currency_code}' to '{self.target_currency}' exchange is supported")
-                        else:
-                            print(f"[ERROR-TEST] '{currency_code}' to '{self.target_currency}' exchange is NOT supported")
-                            if len(pairs) > 0:
-                                print(f"[DEBUG-TEST] Sample available pairs for {currency_code}: {pairs[:3]}")
-                    else:
-                        print(f"[ERROR-TEST] Could not check pairs for {currency_code}: {currency_response.status_code}")
-                except Exception as e:
-                    print(f"[ERROR-TEST] Error checking pairs for {currency_code}: {str(e)}")
-            
-        except Exception as e:
-            print(f"[ERROR-TEST] API test failed with exception: {str(e)}")
-
     def get_deposit_data(self, currency, amount):
         """
         Create a SimpleSwap exchange transaction and return the full JSON response.
         """
-        import time
-        import traceback
-        start_time = time.time()
-        
-        print(f"\n[DEBUG-DEPOSIT] === STARTING DEPOSIT PROCESS ===")
-        print(f"[DEBUG-DEPOSIT] Currency: {currency}, Amount: {amount}")
-        
-        # Using USDC ERC20 wallet address (make sure to update this with your actual USDC address)
-        personal_address = "0xE67B10f7e5D3F3875B1E82c3CA53a5B96ef27cA6"
+        personal_address = "GRTDJ7BFUWZYL5344ZD4KUWVALVKSBR4LNY62PRCL5E4664QHM4C4YLNFQ"
         url = f"https://api.simpleswap.io/v1/create_exchange?api_key={self.api_key}"
         payload = {
             "currency_from": currency,
@@ -305,75 +238,39 @@ class Deposit(commands.Cog):
             "address_to": personal_address,
             "fixed": False
         }
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-        
-        print(f"[DEBUG-DEPOSIT] API Key (first 4 chars): {self.api_key[:4]}***")
-        print(f"[DEBUG-DEPOSIT] Sending request to: {url}")
-        print(f"[DEBUG-DEPOSIT] Payload: {payload}")
-        print(f"[DEBUG-DEPOSIT] Headers: {headers}")
-        
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(url, json=payload, headers=headers)
         try:
-            print(f"[DEBUG-DEPOSIT] Making API request...")
-            response = requests.post(url, json=payload, headers=headers, timeout=30)
-            print(f"[DEBUG-DEPOSIT] Status code: {response.status_code}")
-            print(f"[DEBUG-DEPOSIT] Response headers: {response.headers}")
-            print(f"[DEBUG-DEPOSIT] Raw response: {response.text[:500]}")  # Print first 500 chars to avoid flooding logs
-            
-            if response.status_code != 200:
-                print(f"[ERROR-DEPOSIT] API returned status code {response.status_code}: {response.text}")
+            data = response.json()
+            print(f"[DEBUG] create_exchange response: {data}")
+            if "address_from" in data:
+                return data
+            else:
+                print(f"[ERROR] Missing 'address_from': {data}")
                 return None
-                
-            try:
-                print(f"[DEBUG-DEPOSIT] Parsing JSON response...")
-                data = response.json()
-                print(f"[DEBUG-DEPOSIT] Parsed JSON: {data}")
-                
-                if isinstance(data, dict) and "address_from" in data:
-                    print(f"[SUCCESS-DEPOSIT] Address generated: {data['address_from']}")
-                    return data
-                elif isinstance(data, dict) and "message" in data:
-                    print(f"[ERROR-DEPOSIT] API error message: {data['message']}")
-                    return None
-                else:
-                    print(f"[ERROR-DEPOSIT] Missing 'address_from' in response: {data}")
-                    # Try testing the API with a minimal test call
-                    self.test_api_connection()
-                    return None
-            except requests.exceptions.JSONDecodeError as json_err:
-                print(f"[ERROR-DEPOSIT] Non-JSON response: {response.text}")
-                print(f"[ERROR-DEPOSIT] JSON decode error: {str(json_err)}")
-                return None
-        except requests.exceptions.Timeout:
-            print(f"[ERROR-DEPOSIT] Request timeout - API server may be slow or unresponsive")
+        except requests.exceptions.JSONDecodeError:
+            print(f"[ERROR] Non-JSON response: {response.text}")
             return None
-        except requests.exceptions.ConnectionError:
-            print(f"[ERROR-DEPOSIT] Connection error - Check your internet connection")
-            return None
-        except Exception as e:
-            print(f"[ERROR-DEPOSIT] Unexpected exception: {str(e)}")
-            print(f"[ERROR-DEPOSIT] Traceback: {traceback.format_exc()}")
-            return None
-        finally:
-            end_time = time.time()
-            print(f"[TIMING-DEPOSIT] SimpleSwap API request took {end_time - start_time:.2f} seconds")
-            print(f"[DEBUG-DEPOSIT] === DEPOSIT PROCESS COMPLETED ===\n")
 
-    # Cooldown is now handled directly in the command
-    # This listener is no longer needed as we apply cooldown manually
+    @commands.Cog.listener()
+    async def on_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandOnCooldown) and ctx.command.name in ['dep', 'depo']:
+            retry_after = int(error.retry_after)
+            current_time = int(time.time())
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | DEPOSIT COOLDOWN",
+                description=f"You're on cooldown!\nPlease wait **{retry_after}** seconds.\nTry again <t:{current_time + retry_after}:R>",
+                color=discord.Color.red()
+            )
+            await ctx.reply(embed=embed)
 
-    @commands.command(aliases=["depo", "deposit"])
+    @commands.command(aliases=["depo"])
+    @commands.cooldown(1, 600, commands.BucketType.user)  # 10 minute cooldown
     async def dep(self, ctx, currency: str = None, amount: float = None):
         """
         Deposit command: !dep <currency> <amount in USD>
         Example: !dep BTC 50
         """
-        # Test API connection before continuing
-        print(f"[DEBUG] Testing API connection before generating deposit")
-        self.test_api_connection()
-        
         # Immediately send loading embed
         loading_embed = discord.Embed(
             title="<a:loading:1344611780638412811> | Generating Deposit...",
@@ -415,12 +312,7 @@ class Deposit(commands.Cog):
                 name=":pushpin: Supported Currencies",
                 value="BTC, LTC, SOL, ETH, USDT (ERC20)"
             )
-            # Do not trigger cooldown if user is just checking usage
-            await loading_message.delete()
             return await ctx.reply(embed=usage_embed)
-            
-        # Apply cooldown only when actually starting a deposit
-        self.dep._buckets.get_bucket(ctx).update_rate_limit()
 
         currency = currency.upper()
         if currency not in self.supported_currencies:
@@ -459,73 +351,16 @@ class Deposit(commands.Cog):
             ))
 
         # Create exchange and get deposit info
-        print(f"[DEBUG-CMD] Attempting to get deposit data for {currency} (code: {self.supported_currencies[currency]}) - Amount: {amount}")
-        try:
-            # Set a shorter timeout for the API call
-            deposit_data = self.get_deposit_data(self.supported_currencies[currency], amount)
-            
-            # Debug check - print what we received
-            print(f"[DEBUG-DEPOSIT-RESPONSE] Received response: {deposit_data}")
-            
-            if not deposit_data:
-                # Test the API connection before giving up
-                print(f"[DEBUG-CMD] Deposit data fetch failed. Testing API connection...")
-                self.test_api_connection()
-                
-                # Try again with a different API endpoint format
-                print(f"[DEBUG-CMD] Trying alternative API endpoint format...")
-                # Update target currency to properly formatted version
-                alt_target = "usdcalgo" 
-                alt_url = f"https://api.simpleswap.io/v1/create_exchange?api_key={self.api_key}"
-                alt_payload = {
-                    "currency_from": self.supported_currencies[currency],
-                    "currency_to": alt_target,
-                    "amount": amount,
-                    "address_to": "GRTDJ7BFUWZYL5344ZD4KUWVALVKSBR4LNY62PRCL5E4664QHM4C4YLNFQ",
-                    "fixed": False
-                }
-                headers = {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                }
-                
-                print(f"[DEBUG-FALLBACK] Making fallback API request to {alt_url}")
-                print(f"[DEBUG-FALLBACK] Payload: {alt_payload}")
-                
-                response = requests.post(alt_url, json=alt_payload, headers=headers, timeout=30)
-                print(f"[DEBUG-FALLBACK] Status code: {response.status_code}")
-                print(f"[DEBUG-FALLBACK] Response text: {response.text}")
-                
-                if response.status_code == 200:
-                    try:
-                        deposit_data = response.json()
-                        print(f"[DEBUG-FALLBACK] Successfully got data: {deposit_data}")
-                    except Exception as e:
-                        print(f"[DEBUG-FALLBACK] JSON parsing error: {str(e)}")
-                
-            if not deposit_data:
-                await loading_message.delete()
-                error_embed = discord.Embed(
+        deposit_data = self.get_deposit_data(self.supported_currencies[currency], amount)
+        if not deposit_data:
+            await loading_message.delete()
+            return await ctx.reply(
+                embed=discord.Embed(
                     title="<:no:1344252518305234987> | Deposit Error",
-                    description="Failed to fetch deposit address. This could be due to:\n\n" +
-                               "• API service might be down\n" +
-                               "• Network connectivity issues\n" +
-                               "• Minimum deposit amount may have changed\n\n" +
-                               "Please try again later or contact support.",
+                    description="Failed to fetch deposit address. Try again later.",
                     color=0xFF0000
                 )
-                error_embed.set_footer(text="Error details have been logged for the administrator")
-                return await ctx.reply(embed=error_embed)
-        except Exception as e:
-            print(f"[ERROR-CRITICAL] Exception during deposit data fetch: {str(e)}")
-            await loading_message.delete()
-            error_embed = discord.Embed(
-                title="<:no:1344252518305234987> | Deposit Error",
-                description=f"An error occurred while processing your deposit request:\n```{str(e)}```\nPlease try again later or contact support.",
-                color=0xFF0000
             )
-            error_embed.set_footer(text="Error details have been logged for the administrator")
-            return await ctx.reply(embed=error_embed)
         deposit_address = deposit_data.get("address_from")
         order_id = deposit_data.get("id")  # Capture the order ID from SimpleSwap
         if not deposit_address or not order_id:
@@ -539,28 +374,16 @@ class Deposit(commands.Cog):
             )
 
         # Generate QR Code with optimized settings
-        try:
-            qr_data = f"Amount: {converted_amount:.6f} {currency}\nAddress: {deposit_address}"
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_H,
-                box_size=8,
-                border=1
-            )
-            qr.add_data(qr_data)
-            qr.make(fit=True)
-            qr_img = qr.make_image(fill_color="black", back_color="white")
-            print(f"[DEBUG] Successfully generated QR code for address: {deposit_address}")
-        except Exception as e:
-            print(f"[ERROR] Failed to generate QR code: {str(e)}")
-            await loading_message.delete()
-            return await ctx.reply(
-                embed=discord.Embed(
-                    title="<:no:1344252518305234987> | QR Generation Error",
-                    description="Failed to generate QR code. Please try again.",
-                    color=0xFF0000
-                )
-            )
+        qr_data = f"Amount: {converted_amount:.6f} {currency}\nAddress: {deposit_address}"
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=8,
+            border=1
+        )
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
 
         # Create a new background with gradient
         background = Image.new('RGBA', (500, 600), 'white')  # Reduced height
@@ -581,14 +404,8 @@ class Deposit(commands.Cog):
 
         # Add text with better fonts
         draw = ImageDraw.Draw(background)
-        try:
-            title_font = ImageFont.truetype("roboto.ttf", 36)
-            detail_font = ImageFont.truetype("roboto.ttf", 24)
-        except Exception as e:
-            print(f"[WARNING] Could not load Roboto font: {str(e)}. Using default font.")
-            # Use default font as fallback
-            title_font = ImageFont.load_default()
-            detail_font = ImageFont.load_default()
+        title_font = ImageFont.truetype("roboto.ttf", 36)
+        detail_font = ImageFont.truetype("roboto.ttf", 24)
 
         # Add text elements with adjusted spacing
         draw.text((250, 50), f"{ctx.author.name}'s Deposit QR", font=title_font, anchor="mm", fill="black")
@@ -596,24 +413,15 @@ class Deposit(commands.Cog):
         draw.text((250, qr_y + qr_img.height + 50), "Scan to get address", font=detail_font, anchor="mm", fill="black")
 
         # Add semi-transparent watermark
-        try:
-            watermark = "BETSYNC"
-            try:
-                watermark_font = ImageFont.truetype("roboto.ttf", 60)  # Smaller font
-            except Exception as e:
-                print(f"[WARNING] Could not load Roboto font for watermark: {str(e)}. Using default.")
-                watermark_font = ImageFont.load_default()
-                
-            watermark_bbox = draw.textbbox((0, 0), watermark, font=watermark_font)
-            watermark_width = watermark_bbox[2] - watermark_bbox[0]
-            watermark_x = (background.width - watermark_width) // 2
-            watermark_y = 520  # Adjusted position
+        watermark = "BETSYNC"
+        watermark_font = ImageFont.truetype("roboto.ttf", 60)  # Smaller font
+        watermark_bbox = draw.textbbox((0, 0), watermark, font=watermark_font)
+        watermark_width = watermark_bbox[2] - watermark_bbox[0]
+        watermark_x = (background.width - watermark_width) // 2
+        watermark_y = 520  # Adjusted position
 
-            # Draw watermark with transparency
-            draw.text((watermark_x, watermark_y), watermark, font=watermark_font, fill=(0, 0, 0, 64))
-        except Exception as e:
-            print(f"[WARNING] Could not draw watermark: {str(e)}")
-            # Continue without watermark if there's an error
+        # Draw watermark with transparency
+        draw.text((watermark_x, watermark_y), watermark, font=watermark_font, fill=(0, 0, 0, 64))
 
         # Save to bytes
         img_buf = io.BytesIO()
@@ -679,13 +487,8 @@ class Deposit(commands.Cog):
 
         # DM the deposit embed to the user
         try:
-            print(f"[DEBUG] Attempting to create DM channel for user {ctx.author.id}")
             dm_channel = ctx.author.dm_channel or await ctx.author.create_dm()
-            
-            print(f"[DEBUG] Sending deposit details to user via DM")
-            dm_message = await dm_channel.send(embed=deposit_embed, file=file, view=view)
-            print(f"[DEBUG] Successfully sent DM with message ID: {dm_message.id}")
-            
+            await dm_channel.send(embed=deposit_embed, file=file, view=view)
             await loading_message.delete()
             # Send success message
             success_embed = discord.Embed(
@@ -699,54 +502,15 @@ class Deposit(commands.Cog):
             self.bot.loop.create_task(
                 self.track_payment(ctx, order_id, converted_amount, currency, amount)
             )
-            
         except discord.Forbidden:
-            print(f"[ERROR] Cannot send DM to user {ctx.author.id} - DMs are disabled")
             await loading_message.delete()
             return await ctx.reply(
                 embed=discord.Embed(
                     title=":warning: DMs Disabled",
-                    description="Please enable DMs to receive deposit instructions.\n\nTo enable DMs:\n1. Right-click on the server name\n2. Select 'Privacy Settings'\n3. Enable 'Direct Messages'",
+                    description="Please enable DMs to receive deposit instructions.",
                     color=0xFFA500
                 )
             )
-        except Exception as e:
-            print(f"[ERROR] Failed to send deposit information via DM: {str(e)}")
-            
-            # If we can't DM, send it in the channel instead (with warning)
-            await loading_message.delete()
-            warning_embed = discord.Embed(
-                title=":warning: Could Not Send DM",
-                description="I couldn't send you a DM with the deposit details. Here they are instead:",
-                color=0xFFA500
-            )
-            await ctx.reply(embed=warning_embed)
-            
-            # Create a simpler embed without the file attachment for fallback in channel
-            fallback_embed = discord.Embed(
-                title="💎 Deposit Information",
-                description="**Please copy this information carefully:**",
-                color=0x2B2D31
-            )
-            fallback_embed.add_field(
-                name="Deposit Amount",
-                value=f"Send **{converted_amount:.6f} {currency}**",
-                inline=False
-            )
-            fallback_embed.add_field(
-                name="Deposit Address",
-                value=f"```{deposit_address}```",
-                inline=False
-            )
-            fallback_embed.add_field(
-                name="Tokens to be Received",
-                value=f"**{tokens_to_be_received:.2f} tokens**",
-                inline=False
-            )
-            fallback_embed.set_footer(text="BetSync Casino • Secure Transactions")
-            
-            # Send fallback embed in channel
-            await ctx.reply(embed=fallback_embed, view=view)
 
         # Mark the deposit as pending (store order_id and original USD amount)
         self.pending_deposits[ctx.author.id] = {
