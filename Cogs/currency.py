@@ -273,7 +273,7 @@ class Deposit(commands.Cog):
         """
         # Immediately send loading embed
         loading_embed = discord.Embed(
-            title="<a:Loading:1344251279773405185> | Generating Deposit...",
+            title="<a:loading:1344611780638412811> | Generating Deposit...",
             description="Please wait while we fetch your deposit details.",
             color=discord.Color.gold()
         )
