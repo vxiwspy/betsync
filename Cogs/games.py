@@ -48,6 +48,76 @@ class CrashView(discord.ui.View):
         )
         await interaction.followup.send(embed=feedback_embed, ephemeral=True)
 
+class PlayAgainView(discord.ui.View):
+    def __init__(self, cog, ctx, bet_amount, timeout=60):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.ctx = ctx
+        self.bet_amount = bet_amount
+        self.currency_used = None
+        
+    @discord.ui.button(label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄")
+    async def play_again(self, button, interaction: discord.Interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+            
+        # Disable button to prevent multiple clicks
+        button.disabled = True
+        await interaction.response.edit_message(view=self)
+        
+        # Check if user can afford the same bet
+        db = Users()
+        user_data = db.fetch_user(interaction.user.id)
+        if not user_data:
+            return await interaction.followup.send("Your account couldn't be found. Please try again later.", ephemeral=True)
+        
+        tokens_balance = user_data['tokens']
+        credits_balance = user_data['credits']
+        
+        # Determine if the user can make the same bet or needs to use max available
+        if tokens_balance + credits_balance < self.bet_amount:
+            # User doesn't have enough for the same bet - use max instead
+            bet_amount = tokens_balance + credits_balance
+            if bet_amount <= 0:
+                return await interaction.followup.send("You don't have enough funds to play again.", ephemeral=True)
+                
+            confirm_embed = discord.Embed(
+                title="🎮 Max Bet Confirmation",
+                description=f"You don't have enough for the previous bet of **{self.bet_amount}**.\nPlay with your max bet of **{bet_amount}** instead?",
+                color=0x00FFAE
+            )
+            
+            # Create a confirmation view
+            confirm_view = discord.ui.View(timeout=30)
+            
+            @discord.ui.button(label="Confirm Max Bet", style=discord.ButtonStyle.success)
+            async def confirm_max_bet(b, i):
+                await i.response.defer()
+                for child in confirm_view.children:
+                    child.disabled = True
+                await i.message.edit(view=confirm_view)
+                
+                # Start a new game with max bet
+                await self.cog.crash(self.ctx, str(bet_amount))
+                
+            @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+            async def cancel_max_bet(b, i):
+                await i.response.defer()
+                for child in confirm_view.children:
+                    child.disabled = True
+                await i.message.edit(view=confirm_view)
+                
+                await i.followup.send("Max bet cancelled.", ephemeral=True)
+                
+            confirm_view.add_item(confirm_max_bet)
+            confirm_view.add_item(cancel_max_bet)
+            
+            await interaction.followup.send(embed=confirm_embed, view=confirm_view, ephemeral=True)
+        else:
+            # User can afford the same bet
+            await interaction.followup.send("Starting a new game with the same bet...", ephemeral=True)
+            await self.cog.crash(self.ctx, str(self.bet_amount))
+
 class Games(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -405,8 +475,20 @@ class Games(commands.Cog):
                         {"$inc": {"total_lost": 1}}
                     )
                     
+                    # Create Play Again view
+                    play_again_view = PlayAgainView(self, ctx, bet_amount)
+                    
                     # Update message with crash result
                     await message.edit(embed=embed, attachments=[file], view=view)
+                    
+                    # Add a Play Again message
+                    play_again_embed = discord.Embed(
+                        title="🎮 Play Again?",
+                        description=f"Want to try your luck again with **{bet_amount}**?",
+                        color=0x2B2D31
+                    )
+                    await ctx.send(embed=play_again_embed, view=play_again_view)
+                    
                 except Exception as crash_error:
                     print(f"Error handling crash: {crash_error}")
                     # Simple fallback
@@ -421,6 +503,16 @@ class Games(commands.Cog):
                             color=0xFF0000
                         )
                         await message.edit(embed=embed, view=view)
+                        
+                        # Still try to add Play Again option
+                        play_again_view = PlayAgainView(self, ctx, bet_amount)
+                        play_again_embed = discord.Embed(
+                            title="🎮 Play Again?",
+                            description=f"Want to try your luck again with **{bet_amount}**?",
+                            color=0x2B2D31
+                        )
+                        await ctx.send(embed=play_again_embed, view=play_again_view)
+                        
                     except Exception as fallback_error:
                         print(f"Error updating fallback crash message: {fallback_error}")
                 
@@ -465,8 +557,20 @@ class Games(commands.Cog):
                         {"$inc": {"total_won": 1, "total_earned": winnings}}
                     )
                     
+                    # Create Play Again view
+                    play_again_view = PlayAgainView(self, ctx, bet_amount)
+                    
                     # Update message with win result
                     await message.edit(embed=embed, attachments=[file], view=view)
+                    
+                    # Add a Play Again message
+                    play_again_embed = discord.Embed(
+                        title="🎮 Play Again?",
+                        description=f"Want to try your luck again with **{bet_amount}**?",
+                        color=0x2B2D31
+                    )
+                    await ctx.send(embed=play_again_embed, view=play_again_view)
+                    
                 except Exception as win_error:
                     print(f"Error handling win: {win_error}")
                     # Simple fallback
@@ -485,6 +589,16 @@ class Games(commands.Cog):
                         
                         # Make sure winnings are credited even if graph fails
                         db.update_balance(ctx.author.id, winnings, "credits", "$inc")
+                        
+                        # Still try to add Play Again option
+                        play_again_view = PlayAgainView(self, ctx, bet_amount)
+                        play_again_embed = discord.Embed(
+                            title="🎮 Play Again?",
+                            description=f"Want to try your luck again with **{bet_amount}**?",
+                            color=0x2B2D31
+                        )
+                        await ctx.send(embed=play_again_embed, view=play_again_view)
+                        
                     except Exception as fallback_error:
                         print(f"Error updating fallback win message: {fallback_error}")
             
@@ -528,7 +642,7 @@ class Games(commands.Cog):
             plt.gcf().set_facecolor(bg_color)
             
             # Generate x and y coordinates with more points for smoother curve
-            x = np.linspace(0, current_multiplier, 150)
+            x = np.linspace(0, current_multiplier, 300)  # Increased for smoother curve
             
             # Create a more dynamic curve that starts slower and grows faster
             if current_multiplier <= 1.5:
@@ -541,75 +655,163 @@ class Games(commands.Cog):
             # Scale y values to match the current multiplier
             y = y * (current_multiplier / y[-1])
             
-            # Add subtle gradient background
+            # Add subtle gradient background with more dynamic colors
+            plt.figure(figsize=(10, 6), dpi=100, facecolor=bg_color)
+            ax = plt.gca()
+            ax.set_facecolor(bg_color)
+            
+            # Create a custom gradient that changes based on multiplier and state
+            if crashed:
+                gradient_colors = plt.cm.hot(np.linspace(0, 1, 100))
+                gradient_alpha = 0.15
+            elif cash_out:
+                gradient_colors = plt.cm.viridis(np.linspace(0, 1, 100))
+                gradient_alpha = 0.15
+            else:
+                if current_multiplier < 2:
+                    gradient_colors = plt.cm.viridis(np.linspace(0, 1, 100))
+                elif current_multiplier < 5:
+                    gradient_colors = plt.cm.plasma(np.linspace(0, 1, 100))
+                else:
+                    gradient_colors = plt.cm.inferno(np.linspace(0, 1, 100))
+                gradient_alpha = 0.12 + min(0.03, current_multiplier * 0.005)  # Increases with multiplier
+                
+            # Apply gradient background
             gradient = np.linspace(0, 1, 100).reshape(-1, 1)
-            gradient_colors = plt.cm.viridis(gradient)
-            gradient_colors[:, 3] = 0.1  # Set alpha for transparency
             plt.imshow(gradient, extent=[0, max(2, current_multiplier * 1.1), 0, max(2, current_multiplier * 1.1)], 
-                      aspect='auto', cmap='viridis', alpha=0.1)
+                      aspect='auto', cmap='viridis', alpha=gradient_alpha)
+            
+            # Add subtle glowing effect
+            for i, alpha in zip(range(3), [0.05, 0.03, 0.01]):
+                plt.plot(x, y, color='white', linewidth=6+i*2, alpha=alpha, zorder=1)
             
             # Determine line color and style based on game state
             if crashed:
                 line_color = '#FF5555'  # Bright red for crash
                 line_style = '-'
                 line_width = 4
+                glow_color = '#FF0000'
             elif cash_out:
                 line_color = '#55FF55'  # Bright green for cashout
                 line_style = '-'
                 line_width = 4
+                glow_color = '#00FF00'
             else:
-                # Create a gradient line that changes from cyan to yellow to orange as multiplier increases
-                line_color = '#00FFAE'  # Teal/cyan color
-                if current_multiplier > 2:
+                # Create a gradient line color based on multiplier
+                if current_multiplier < 1.5:
+                    line_color = '#00FFAE'  # Teal/cyan color
+                    glow_color = '#00FFAE'
+                elif current_multiplier < 3:
                     line_color = '#FFDD00'  # Yellow
-                if current_multiplier > 5:
+                    glow_color = '#FFDD00'
+                elif current_multiplier < 7:
                     line_color = '#FF8800'  # Orange
+                    glow_color = '#FF8800'
+                else:
+                    line_color = '#FF4400'  # Deep orange/red
+                    glow_color = '#FF4400'
                 line_style = '-'
                 line_width = 3.5
+                
+            # Add subtle line glow effect
+            for i, alpha in zip(range(3), [0.2, 0.1, 0.05]):
+                plt.plot(x, y, color=glow_color, linewidth=line_width+i, alpha=alpha, zorder=3)
             
             # Plot the main line
-            plt.plot(x, y, color=line_color, linewidth=line_width, linestyle=line_style, path_effects=[
+            plt.plot(x, y, color=line_color, linewidth=line_width, linestyle=line_style, zorder=4, path_effects=[
                 plt.matplotlib.patheffects.withStroke(linewidth=5, foreground='black', alpha=0.3)
             ])
             
             # Add points along the curve for visual effect
             if not crashed and not cash_out and current_multiplier > 1.2:
-                point_indices = np.linspace(0, len(x)-1, min(int(current_multiplier * 3), 30), dtype=int)
-                plt.scatter(x[point_indices], y[point_indices], color='white', s=15, alpha=0.5, zorder=4)
+                # More points for higher multipliers
+                n_points = min(int(current_multiplier * 4), 40)
+                point_indices = np.linspace(0, len(x)-1, n_points, dtype=int)
+                
+                # Add glow to points
+                for i, alpha in zip(range(3), [0.1, 0.05, 0.02]):
+                    plt.scatter(x[point_indices], y[point_indices], color='white', s=20+i*10, alpha=alpha, zorder=4)
+                
+                # Main points with pulsating sizes based on index
+                sizes = 15 + 10 * np.sin(np.linspace(0, 2*np.pi, len(point_indices)))
+                plt.scatter(x[point_indices], y[point_indices], color='white', s=sizes, alpha=0.7, zorder=5)
             
             # Add special markers and text for crash or cash out points
             if crashed:
-                # Add explosion effect for crash
-                plt.scatter([current_multiplier], [current_multiplier], color='red', s=150, marker='*', zorder=5)
-                # Add shadow/glow effect
-                plt.scatter([current_multiplier], [current_multiplier], color='darkred', s=200, marker='*', alpha=0.3, zorder=4)
+                # Create explosion effect for crash
+                for i, alpha in zip(range(5), [0.05, 0.1, 0.15, 0.2, 0.3]):
+                    plt.scatter([current_multiplier], [current_multiplier], color='darkred', 
+                               s=400-i*50, marker='*', alpha=alpha, zorder=5+i)
+                
+                # Main explosion
+                plt.scatter([current_multiplier], [current_multiplier], color='red', s=150, marker='*', zorder=10)
+                
+                # Add "boom" lines radiating from crash point
+                n_lines = 12
+                for i in range(n_lines):
+                    angle = 2 * np.pi * i / n_lines
+                    length = 0.3 + 0.1 * np.random.random()
+                    dx, dy = length * np.cos(angle), length * np.sin(angle)
+                    plt.plot([current_multiplier, current_multiplier+dx], 
+                            [current_multiplier, current_multiplier+dy],
+                            color='red', alpha=0.6, linewidth=1.5, zorder=9)
                 
                 # Add crash text with shadow effect
-                plt.text(current_multiplier, current_multiplier + 0.2, f"CRASHED AT {current_multiplier:.2f}x", 
-                         color='white', fontweight='bold', fontsize=12, ha='right', va='bottom',
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor='red', alpha=0.7, edgecolor='darkred'))
+                plt.text(current_multiplier, current_multiplier + 0.3, f"CRASHED AT {current_multiplier:.2f}x", 
+                         color='white', fontweight='bold', fontsize=14, ha='right', va='bottom',
+                         bbox=dict(boxstyle="round,pad=0.3", facecolor='red', alpha=0.8, edgecolor='darkred'),
+                         path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=3, foreground='black', alpha=0.3)])
             
             elif cash_out:
-                # Add diamond symbol for cash out
-                plt.scatter([current_multiplier], [current_multiplier], color='lime', s=130, marker='D', zorder=5)
-                # Add shadow/glow effect
-                plt.scatter([current_multiplier], [current_multiplier], color='green', s=180, marker='D', alpha=0.3, zorder=4)
+                # Add diamond symbol for cash out with glowing effect
+                for i, alpha in zip(range(5), [0.05, 0.1, 0.15, 0.2, 0.3]):
+                    plt.scatter([current_multiplier], [current_multiplier], color='darkgreen', 
+                               s=300-i*30, marker='D', alpha=alpha, zorder=5+i)
+                
+                # Main diamond
+                plt.scatter([current_multiplier], [current_multiplier], color='lime', s=130, marker='D', zorder=10)
+                
+                # Add shine effect on diamond
+                plt.plot([current_multiplier-0.1, current_multiplier+0.1], 
+                        [current_multiplier+0.1, current_multiplier-0.1],
+                        color='white', alpha=0.8, linewidth=1.5, zorder=11)
                 
                 # Add cash out text with shadow effect
-                plt.text(current_multiplier, current_multiplier + 0.2, f"CASHED OUT AT {current_multiplier:.2f}x", 
-                         color='white', fontweight='bold', fontsize=12, ha='right', va='bottom',
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor='green', alpha=0.7, edgecolor='darkgreen'))
+                plt.text(current_multiplier, current_multiplier + 0.3, f"CASHED OUT AT {current_multiplier:.2f}x", 
+                         color='white', fontweight='bold', fontsize=14, ha='right', va='bottom',
+                         bbox=dict(boxstyle="round,pad=0.3", facecolor='green', alpha=0.8, edgecolor='darkgreen'),
+                         path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=3, foreground='black', alpha=0.3)])
             
-            # Add current multiplier in the top-right corner
+            # Add current multiplier display
+            # Create a more prominent display in top-right corner
             if not crashed and not cash_out:
+                # Add glowing effect around the multiplier text
+                for i, alpha in zip(range(3), [0.1, 0.07, 0.04]):
+                    plt.text(0.95, 0.95, f"{current_multiplier:.2f}x", 
+                             transform=plt.gca().transAxes, color='white', fontsize=22+i, fontweight='bold', 
+                             ha='right', va='top', alpha=alpha,
+                             path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=3, foreground='black', alpha=0.3)])
+                
+                # Main multiplier text
                 plt.text(0.95, 0.95, f"{current_multiplier:.2f}x", 
-                         transform=plt.gca().transAxes, color='white', fontsize=20, fontweight='bold', ha='right', va='top',
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor=line_color, alpha=0.7))
+                         transform=plt.gca().transAxes, color='white', fontsize=22, fontweight='bold', 
+                         ha='right', va='top',
+                         bbox=dict(boxstyle="round,pad=0.3", facecolor=line_color, alpha=0.8, edgecolor='white', linewidth=1),
+                         path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=2, foreground='black', alpha=0.3)])
             
-            # Set axes properties with grid and better styling
-            plt.grid(True, linestyle='--', alpha=0.2, color='gray')
-            plt.xlim(0, max(2, current_multiplier * 1.1))
-            plt.ylim(0, max(2, current_multiplier * 1.1))
+            # Set axes properties with improved grid
+            plt.grid(True, linestyle='--', alpha=0.15, color='white')
+            
+            # Add grid highlights at important multiplier levels
+            highlight_multipliers = [2, 5, 10, 15]
+            for m in highlight_multipliers:
+                if m <= current_multiplier * 1.1:
+                    plt.axhline(y=m, color='white', alpha=0.2, linestyle='-', linewidth=0.8)
+                    plt.text(0.05, m, f"{m}x", color='white', alpha=0.5, fontsize=8, va='bottom')
+            
+            # Set limits with more headroom for visual effect
+            plt.xlim(0, max(2, current_multiplier * 1.15))
+            plt.ylim(0, max(2, current_multiplier * 1.15))
             
             # Remove axis numbers, keep only the graph
             plt.xticks([])
@@ -621,11 +823,12 @@ class Games(commands.Cog):
             
             # Add subtle BetSync watermark/branding
             plt.text(0.5, 0.03, "BetSync Casino", transform=plt.gca().transAxes,
-                    color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center')
+                    color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center',
+                    path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=2, foreground='black', alpha=0.2)])
             
-            # Save plot to bytes buffer
+            # Save plot to bytes buffer with higher quality
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight', transparent=False)
+            plt.savefig(buf, format='png', dpi=120, bbox_inches='tight', transparent=False)
             buf.seek(0)
             
             # Create discord File object
