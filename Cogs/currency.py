@@ -225,47 +225,6 @@ class Deposit(commands.Cog):
             print(f"[ERROR] Unable to fetch minimum deposit: {e}")
             return None
 
-    def get_deposit_data(self, currency, amount):
-        """
-        Create a SimpleSwap exchange transaction and return the full JSON response.
-        """
-        import time
-        import traceback
-        start_time = time.time()
-        
-        print(f"\n[DEBUG-DEPOSIT] === STARTING DEPOSIT PROCESS ===")
-        print(f"[DEBUG-DEPOSIT] Currency: {currency}, Amount: {amount}")
-        
-        personal_address = "GRTDJ7BFUWZYL5344ZD4KUWVALVKSBR4LNY62PRCL5E4664QHM4C4YLNFQ"
-        url = f"https://api.simpleswap.io/v1/create_exchange?api_key={self.api_key}"
-        payload = {
-            "currency_from": currency,
-            "currency_to": self.target_currency,
-            "amount": amount,
-            "address_to": personal_address,
-            "fixed": False
-        }
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-        
-        print(f"[DEBUG-DEPOSIT] API Key (first 4 chars): {self.api_key[:4]}***")
-        print(f"[DEBUG-DEPOSIT] Sending request to: {url}")
-        print(f"[DEBUG-DEPOSIT] Payload: {payload}")
-        print(f"[DEBUG-DEPOSIT] Headers: {headers}")
-        
-        try:
-            print(f"[DEBUG-DEPOSIT] Making API request...")
-            response = requests.post(url, json=payload, headers=headers, timeout=30)
-            print(f"[DEBUG-DEPOSIT] Status code: {response.status_code}")
-            print(f"[DEBUG-DEPOSIT] Response headers: {response.headers}")
-            print(f"[DEBUG-DEPOSIT] Raw response: {response.text[:500]}")  # Print first 500 chars to avoid flooding logs
-            
-            if response.status_code != 200:
-                print(f"[ERROR-DEPOSIT] API returned status code {response.status_code}: {response.text}")
-                return None
-
     def test_api_connection(self):
         """
         Test the SimpleSwap API connection with a minimal request to diagnose issues.
@@ -309,7 +268,46 @@ class Deposit(commands.Cog):
         except Exception as e:
             print(f"[ERROR-TEST] API test failed with exception: {str(e)}")
 
-
+    def get_deposit_data(self, currency, amount):
+        """
+        Create a SimpleSwap exchange transaction and return the full JSON response.
+        """
+        import time
+        import traceback
+        start_time = time.time()
+        
+        print(f"\n[DEBUG-DEPOSIT] === STARTING DEPOSIT PROCESS ===")
+        print(f"[DEBUG-DEPOSIT] Currency: {currency}, Amount: {amount}")
+        
+        personal_address = "GRTDJ7BFUWZYL5344ZD4KUWVALVKSBR4LNY62PRCL5E4664QHM4C4YLNFQ"
+        url = f"https://api.simpleswap.io/v1/create_exchange?api_key={self.api_key}"
+        payload = {
+            "currency_from": currency,
+            "currency_to": self.target_currency,
+            "amount": amount,
+            "address_to": personal_address,
+            "fixed": False
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        print(f"[DEBUG-DEPOSIT] API Key (first 4 chars): {self.api_key[:4]}***")
+        print(f"[DEBUG-DEPOSIT] Sending request to: {url}")
+        print(f"[DEBUG-DEPOSIT] Payload: {payload}")
+        print(f"[DEBUG-DEPOSIT] Headers: {headers}")
+        
+        try:
+            print(f"[DEBUG-DEPOSIT] Making API request...")
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            print(f"[DEBUG-DEPOSIT] Status code: {response.status_code}")
+            print(f"[DEBUG-DEPOSIT] Response headers: {response.headers}")
+            print(f"[DEBUG-DEPOSIT] Raw response: {response.text[:500]}")  # Print first 500 chars to avoid flooding logs
+            
+            if response.status_code != 200:
+                print(f"[ERROR-DEPOSIT] API returned status code {response.status_code}: {response.text}")
+                return None
                 
             try:
                 print(f"[DEBUG-DEPOSIT] Parsing JSON response...")
