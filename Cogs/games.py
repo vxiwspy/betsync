@@ -955,23 +955,21 @@ class Games(commands.Cog):
             plt.text(0.5, 0.03, brand_text, transform=plt.gca().transAxes,
                     color='white', alpha=0.6, fontsize=14, fontweight='bold', ha='center')
             
-            # Add subtle vignette effect around the edges
+            # Add subtle vignette effect around the edges (improved version)
             def add_vignette(ax, intensity=0.5):
                 """Add a vignette effect to the plot for a premium look"""
-                # Create radial gradient for vignette
-                rad = np.linspace(0, 1, 100)**2
-                h, w = 100, 100
-                xx, yy = np.meshgrid(np.linspace(-1, 1, w), np.linspace(-1, 1, h))
-                r = np.sqrt(xx**2 + yy**2)
-                r = np.clip(r, 0, 1)
-                opacity = np.ones_like(r) * np.interp(r, [0.7, 1.0], [0, intensity])
+                # Create a rectangle that covers the entire plot area with transparent center
+                # and dark edges for the vignette effect
+                from matplotlib.patches import Rectangle
                 
-                # Apply vignette as an image overlay
-                ax.imshow(opacity, extent=[-0.1, current_multiplier*1.2, -0.1, current_multiplier*1.2], 
-                         cmap='gray', aspect='auto', alpha=0.95, zorder=10)
+                rect = Rectangle((0, 0), max(1.5, current_multiplier * 1.1), 
+                                max(1.5, current_multiplier * 1.1),
+                                facecolor='none', edgecolor=bg_color, 
+                                linewidth=60, alpha=intensity, zorder=9)
+                ax.add_patch(rect)
             
-            # Add subtle vignette effect
-            add_vignette(ax, intensity=0.7)
+            # Add subtle vignette effect with lower intensity to avoid the white/black circle issue
+            add_vignette(ax, intensity=0.4)
             
             # Add a subtle noise texture for a premium paper-like feel
             def add_noise_texture(intensity=0.03):
