@@ -16,46 +16,60 @@ class HistoryView(discord.ui.View):
         self.page = page
         self.per_page = 10
         self.max_pages = 0
+        self.message = None
         
-        # Add the category buttons
-        self.add_category_buttons()
-        # Add pagination buttons
-        self.add_pagination_buttons()
+        # Calculate the initial max pages
+        self._calculate_max_pages()
+        
+        # Add the buttons to the view
+        self._update_buttons()
     
-    def add_category_buttons(self):
-        # Add category selection buttons
+    def _calculate_max_pages(self):
+        """Calculate the maximum number of pages for the current category"""
+        filtered = self._get_filtered_history(full=True)
+        self.max_pages = max(1, (len(filtered) + self.per_page - 1) // self.per_page)
+    
+    def _update_buttons(self):
+        """Update all buttons in the view based on current state"""
+        self.clear_items()
+        
+        # Add category buttons
         self.add_item(discord.ui.Button(label="All", style=discord.ButtonStyle.primary if self.category == "all" else discord.ButtonStyle.secondary, custom_id="all"))
         self.add_item(discord.ui.Button(label="Deposits", style=discord.ButtonStyle.primary if self.category == "deposit" else discord.ButtonStyle.secondary, custom_id="deposit"))
         self.add_item(discord.ui.Button(label="Withdrawals", style=discord.ButtonStyle.primary if self.category == "withdraw" else discord.ButtonStyle.secondary, custom_id="withdraw"))
         self.add_item(discord.ui.Button(label="Wins", style=discord.ButtonStyle.primary if self.category == "win" else discord.ButtonStyle.secondary, custom_id="win"))
         self.add_item(discord.ui.Button(label="Losses", style=discord.ButtonStyle.primary if self.category == "loss" else discord.ButtonStyle.secondary, custom_id="loss"))
-    
-    def add_pagination_buttons(self):
-        # Add previous and next buttons for pagination
+        
+        # Add pagination buttons
         self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="prev", disabled=self.page == 0))
         self.add_item(discord.ui.Button(emoji="➡️", style=discord.ButtonStyle.secondary, custom_id="next", disabled=self.page >= self.max_pages - 1))
     
-    def filter_history(self):
-        """Filter history based on the selected category"""
-        filtered = []
+    def _get_filtered_history(self, full=False):
+        """Get filtered history based on the selected category
+        
+        Args:
+            full: If True, return all items in category, otherwise return just current page items
+        """
         if self.category == "all":
-            filtered = self.history_data[:20]  # Get recent 20 items
+            filtered = self.history_data
         else:
-            # Filter by type and get at most 20 recent items
-            filtered = [item for item in self.history_data if item.get("type") == self.category][:20]
+            filtered = [item for item in self.history_data if item.get("type") == self.category]
         
-        # Calculate max pages
-        self.max_pages = max(1, (len(filtered) + self.per_page - 1) // self.per_page)
+        # Sort by timestamp (most recent first)
+        filtered.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
         
-        # Get items for current page
-        start_idx = self.page * self.per_page
-        end_idx = min(start_idx + self.per_page, len(filtered))
+        # Limit to 20 items if not requesting full list
+        if not full:
+            # Get items for current page
+            start_idx = self.page * self.per_page
+            end_idx = min(start_idx + self.per_page, len(filtered))
+            return filtered[start_idx:end_idx]
         
-        return filtered[start_idx:end_idx]
+        return filtered
     
     def create_embed(self):
         """Create the history embed with the filtered data"""
-        filtered_data = self.filter_history()
+        filtered_data = self._get_filtered_history()
         
         # Prepare embed
         embed = discord.Embed(
@@ -114,51 +128,90 @@ class HistoryView(discord.ui.View):
         
         # Try to update the message with disabled buttons
         try:
-            message = self.message
-            await message.edit(view=self)
+            await self.message.edit(view=self)
         except:
             pass
-    
-    @discord.ui.button(label="", style=discord.ButtonStyle.primary, custom_id="all")
-    async def all_button_callback(self, button, interaction):
-        self.category = "all"
-        self.page = 0
+            
+    async def interaction_check(self, interaction):
+        """Check if the person clicking is the same as the command author"""
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("This is not your command. Type `!history` to view your own history.", ephemeral=True)
+            return False
+        
+        # Handle the button click
+        await self.button_callback(interaction)
+        return False  # Return False to prevent the default handling
+        
+    async def button_callback(self, interaction):
+        """Handle button interactions"""
+        custom_id = interaction.data.get("custom_id")
+        
+        if custom_id == "all":
+            self.category = "all"
+            self.page = 0
+        elif custom_id == "deposit":
+            self.category = "deposit"
+            self.page = 0
+        elif custom_id == "withdraw":
+            self.category = "withdraw"
+            self.page = 0
+        elif custom_id == "win":
+            self.category = "win"
+            self.page = 0
+        elif custom_id == "loss":
+            self.category = "loss"
+            self.page = 0
+        elif custom_id == "prev":
+            if self.page > 0:
+                self.page -= 1
+        elif custom_id == "next":
+            if self.page < self.max_pages - 1:
+                self.page += 1
+        
+        # Recalculate max pages
+        self._calculate_max_pages()
+        
+        # Update buttons
+        self._update_buttons()
+        
+        # Update the message
         await interaction.response.edit_message(embed=self.create_embed(), view=self)
     
-    @discord.ui.button(label="", style=discord.ButtonStyle.primary, custom_id="deposit")
-    async def deposit_button_callback(self, button, interaction):
-        self.category = "deposit"
-        self.page = 0
-        await interaction.response.edit_message(embed=self.create_embed(), view=self)
-    
-    @discord.ui.button(label="", style=discord.ButtonStyle.primary, custom_id="withdraw")
-    async def withdraw_button_callback(self, button, interaction):
-        self.category = "withdraw"
-        self.page = 0
-        await interaction.response.edit_message(embed=self.create_embed(), view=self)
-    
-    @discord.ui.button(label="", style=discord.ButtonStyle.primary, custom_id="win")
-    async def win_button_callback(self, button, interaction):
-        self.category = "win"
-        self.page = 0
-        await interaction.response.edit_message(embed=self.create_embed(), view=self)
-    
-    @discord.ui.button(label="", style=discord.ButtonStyle.primary, custom_id="loss")
-    async def loss_button_callback(self, button, interaction):
-        self.category = "loss"
-        self.page = 0
-        await interaction.response.edit_message(embed=self.create_embed(), view=self)
-    
-    @discord.ui.button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="prev")
-    async def prev_button_callback(self, button, interaction):
-        if self.page > 0:
-            self.page -= 1
-        await interaction.response.edit_message(embed=self.create_embed(), view=self)
-    
-    @discord.ui.button(emoji="➡️", style=discord.ButtonStyle.secondary, custom_id="next")
-    async def next_button_callback(self, button, interaction):
-        if self.page < self.max_pages - 1:
-            self.page += 1
+    async def on_interaction(self, interaction):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("This is not your command. Type `!history` to view your own history.", ephemeral=True)
+            return
+            
+        custom_id = interaction.data.get("custom_id")
+        
+        if custom_id == "all":
+            self.category = "all"
+            self.page = 0
+        elif custom_id == "deposit":
+            self.category = "deposit"
+            self.page = 0
+        elif custom_id == "withdraw":
+            self.category = "withdraw"
+            self.page = 0
+        elif custom_id == "win":
+            self.category = "win"
+            self.page = 0
+        elif custom_id == "loss":
+            self.category = "loss"
+            self.page = 0
+        elif custom_id == "prev":
+            if self.page > 0:
+                self.page -= 1
+        elif custom_id == "next":
+            if self.page < self.max_pages - 1:
+                self.page += 1
+        
+        # Remove old buttons and create fresh ones
+        self.clear_items()
+        self.add_category_buttons()
+        self.add_pagination_buttons()
+        
+        # Update the message
         await interaction.response.edit_message(embed=self.create_embed(), view=self)
 
 
