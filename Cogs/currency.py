@@ -131,7 +131,7 @@ class DepositCancelView(discord.ui.View):
 class Deposit(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.target_currency = "usdcalgo"  # Target currency for deposits
+        self.target_currency = "usdc"  # Target currency for deposits (changed from usdcalgo to usdc)
         self.api_key = "d676247c-fbc2-4490-9fbf-e0e60a4e2066"  # SimpleSwap API key
         self.supported_currencies = {
             "BTC": "btc",
@@ -246,6 +246,15 @@ class Deposit(commands.Cog):
                     data = response.json()
                     if isinstance(data, list) and len(data) > 0:
                         print(f"[DEBUG-TEST] API returned a list of {len(data)} currencies")
+                        # Verify our target currency is in the list
+                        if self.target_currency in data:
+                            print(f"[DEBUG-TEST] Target currency '{self.target_currency}' is supported")
+                        else:
+                            print(f"[ERROR-TEST] Target currency '{self.target_currency}' is NOT in the supported currencies list!")
+                            # Try to find some alternative stable coins
+                            stablecoins = [c for c in data if 'usd' in c.lower()][:5]
+                            if stablecoins:
+                                print(f"[DEBUG-TEST] Available stablecoins: {stablecoins}")
                     else:
                         print(f"[DEBUG-TEST] API returned unexpected data format: {data}")
                 except Exception as e:
@@ -253,21 +262,24 @@ class Deposit(commands.Cog):
             else:
                 print(f"[ERROR-TEST] API test failed with status code {response.status_code}: {response.text}")
                 
-            # Check specific currency support
-            if self.target_currency == "usdcalgo":
-                print(f"[DEBUG-TEST] Checking if target currency '{self.target_currency}' is supported...")
-                currency_check_url = f"https://api.simpleswap.io/v1/get_pairs?api_key={self.api_key}&fixed=false&currency_from=btc"
-                currency_response = requests.get(currency_check_url, timeout=10)
-                
-                if currency_response.status_code == 200:
-                    pairs = currency_response.json()
-                    if self.target_currency in pairs:
-                        print(f"[DEBUG-TEST] Target currency '{self.target_currency}' is supported")
+            # Check if our supported currencies are valid
+            print(f"[DEBUG-TEST] Checking supported currencies...")
+            for currency_code in self.supported_currencies.values():
+                currency_check_url = f"https://api.simpleswap.io/v1/get_pairs?api_key={self.api_key}&fixed=false&currency_from={currency_code}"
+                try:
+                    currency_response = requests.get(currency_check_url, timeout=10)
+                    if currency_response.status_code == 200:
+                        pairs = currency_response.json()
+                        if self.target_currency in pairs:
+                            print(f"[DEBUG-TEST] '{currency_code}' to '{self.target_currency}' exchange is supported")
+                        else:
+                            print(f"[ERROR-TEST] '{currency_code}' to '{self.target_currency}' exchange is NOT supported")
+                            if len(pairs) > 0:
+                                print(f"[DEBUG-TEST] Sample available pairs for {currency_code}: {pairs[:3]}")
                     else:
-                        print(f"[ERROR-TEST] Target currency '{self.target_currency}' is NOT in the supported pairs list")
-                        print(f"[DEBUG-TEST] First 10 supported pairs: {pairs[:10]}")
-                else:
-                    print(f"[ERROR-TEST] Could not check currency pairs: {currency_response.status_code}")
+                        print(f"[ERROR-TEST] Could not check pairs for {currency_code}: {currency_response.status_code}")
+                except Exception as e:
+                    print(f"[ERROR-TEST] Error checking pairs for {currency_code}: {str(e)}")
             
         except Exception as e:
             print(f"[ERROR-TEST] API test failed with exception: {str(e)}")
@@ -283,7 +295,8 @@ class Deposit(commands.Cog):
         print(f"\n[DEBUG-DEPOSIT] === STARTING DEPOSIT PROCESS ===")
         print(f"[DEBUG-DEPOSIT] Currency: {currency}, Amount: {amount}")
         
-        personal_address = "GRTDJ7BFUWZYL5344ZD4KUWVALVKSBR4LNY62PRCL5E4664QHM4C4YLNFQ"
+        # Using USDC ERC20 wallet address (make sure to update this with your actual USDC address)
+        personal_address = "0xE67B10f7e5D3F3875B1E82c3CA53a5B96ef27cA6"
         url = f"https://api.simpleswap.io/v1/create_exchange?api_key={self.api_key}"
         payload = {
             "currency_from": currency,
