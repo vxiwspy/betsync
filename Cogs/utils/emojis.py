@@ -9,6 +9,6 @@ def emoji():
     "highroller": "<:High_roller:1340292419811545108>",
     "generousgiver": "<:generous_giver:1340292410327961740>",
     "bigwinner": "<:Big_winner:1340292414211887185>",
-    "loading": "<a:loading:1340988939401429074>",
+    "loading": "<a:loading:1344611780638412811>",
     "stats": "<:Stats:1344014084580053076>",
     }

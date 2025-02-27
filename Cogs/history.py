@@ -221,6 +221,15 @@ class History(commands.Cog):
     @commands.command(aliases=["transactions", "logs"])
     async def history(self, ctx, user: discord.Member = None):
         """View your transaction history with filtering by category and pagination"""
+        # Send loading embed first
+        loading_emoji = emoji()["loading"]
+        loading_embed = discord.Embed(
+            title=f"{loading_emoji} | Loading Transaction History...",
+            description="Please wait while we fetch your transaction history.",
+            color=0x00FFAE
+        )
+        loading_message = await ctx.reply(embed=loading_embed)
+        
         if user is None:
             user = ctx.author
 
@@ -243,6 +252,10 @@ class History(commands.Cog):
 
         # Send initial embed
         embed = view.create_embed()
+        
+        # Delete the loading message
+        await loading_message.delete()
+        
         message = await ctx.reply(embed=embed, view=view)
 
         # Store the message for later reference in the view
