@@ -229,6 +229,9 @@ class Deposit(commands.Cog):
         """
         Create a SimpleSwap exchange transaction and return the full JSON response.
         """
+        import time
+        start_time = time.time()
+        
         personal_address = "GRTDJ7BFUWZYL5344ZD4KUWVALVKSBR4LNY62PRCL5E4664QHM4C4YLNFQ"
         url = f"https://api.simpleswap.io/v1/create_exchange?api_key={self.api_key}"
         payload = {
@@ -271,6 +274,9 @@ class Deposit(commands.Cog):
         except Exception as e:
             print(f"[ERROR] Exception during API request: {str(e)}")
             return None
+        finally:
+            end_time = time.time()
+            print(f"[TIMING] SimpleSwap API request took {end_time - start_time:.2f} seconds")
 
     # Cooldown is now handled directly in the command
     # This listener is no longer needed as we apply cooldown manually
@@ -389,16 +395,28 @@ class Deposit(commands.Cog):
             )
 
         # Generate QR Code with optimized settings
-        qr_data = f"Amount: {converted_amount:.6f} {currency}\nAddress: {deposit_address}"
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_H,
-            box_size=8,
-            border=1
-        )
-        qr.add_data(qr_data)
-        qr.make(fit=True)
-        qr_img = qr.make_image(fill_color="black", back_color="white")
+        try:
+            qr_data = f"Amount: {converted_amount:.6f} {currency}\nAddress: {deposit_address}"
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_H,
+                box_size=8,
+                border=1
+            )
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            print(f"[DEBUG] Successfully generated QR code for address: {deposit_address}")
+        except Exception as e:
+            print(f"[ERROR] Failed to generate QR code: {str(e)}")
+            await loading_message.delete()
+            return await ctx.reply(
+                embed=discord.Embed(
+                    title="<:no:1344252518305234987> | QR Generation Error",
+                    description="Failed to generate QR code. Please try again.",
+                    color=0xFF0000
+                )
+            )
 
         # Create a new background with gradient
         background = Image.new('RGBA', (500, 600), 'white')  # Reduced height
@@ -419,8 +437,14 @@ class Deposit(commands.Cog):
 
         # Add text with better fonts
         draw = ImageDraw.Draw(background)
-        title_font = ImageFont.truetype("roboto.ttf", 36)
-        detail_font = ImageFont.truetype("roboto.ttf", 24)
+        try:
+            title_font = ImageFont.truetype("roboto.ttf", 36)
+            detail_font = ImageFont.truetype("roboto.ttf", 24)
+        except Exception as e:
+            print(f"[WARNING] Could not load Roboto font: {str(e)}. Using default font.")
+            # Use default font as fallback
+            title_font = ImageFont.load_default()
+            detail_font = ImageFont.load_default()
 
         # Add text elements with adjusted spacing
         draw.text((250, 50), f"{ctx.author.name}'s Deposit QR", font=title_font, anchor="mm", fill="black")
@@ -428,15 +452,24 @@ class Deposit(commands.Cog):
         draw.text((250, qr_y + qr_img.height + 50), "Scan to get address", font=detail_font, anchor="mm", fill="black")
 
         # Add semi-transparent watermark
-        watermark = "BETSYNC"
-        watermark_font = ImageFont.truetype("roboto.ttf", 60)  # Smaller font
-        watermark_bbox = draw.textbbox((0, 0), watermark, font=watermark_font)
-        watermark_width = watermark_bbox[2] - watermark_bbox[0]
-        watermark_x = (background.width - watermark_width) // 2
-        watermark_y = 520  # Adjusted position
+        try:
+            watermark = "BETSYNC"
+            try:
+                watermark_font = ImageFont.truetype("roboto.ttf", 60)  # Smaller font
+            except Exception as e:
+                print(f"[WARNING] Could not load Roboto font for watermark: {str(e)}. Using default.")
+                watermark_font = ImageFont.load_default()
+                
+            watermark_bbox = draw.textbbox((0, 0), watermark, font=watermark_font)
+            watermark_width = watermark_bbox[2] - watermark_bbox[0]
+            watermark_x = (background.width - watermark_width) // 2
+            watermark_y = 520  # Adjusted position
 
-        # Draw watermark with transparency
-        draw.text((watermark_x, watermark_y), watermark, font=watermark_font, fill=(0, 0, 0, 64))
+            # Draw watermark with transparency
+            draw.text((watermark_x, watermark_y), watermark, font=watermark_font, fill=(0, 0, 0, 64))
+        except Exception as e:
+            print(f"[WARNING] Could not draw watermark: {str(e)}")
+            # Continue without watermark if there's an error
 
         # Save to bytes
         img_buf = io.BytesIO()
@@ -502,8 +535,13 @@ class Deposit(commands.Cog):
 
         # DM the deposit embed to the user
         try:
+            print(f"[DEBUG] Attempting to create DM channel for user {ctx.author.id}")
             dm_channel = ctx.author.dm_channel or await ctx.author.create_dm()
-            await dm_channel.send(embed=deposit_embed, file=file, view=view)
+            
+            print(f"[DEBUG] Sending deposit details to user via DM")
+            dm_message = await dm_channel.send(embed=deposit_embed, file=file, view=view)
+            print(f"[DEBUG] Successfully sent DM with message ID: {dm_message.id}")
+            
             await loading_message.delete()
             # Send success message
             success_embed = discord.Embed(
@@ -517,15 +555,54 @@ class Deposit(commands.Cog):
             self.bot.loop.create_task(
                 self.track_payment(ctx, order_id, converted_amount, currency, amount)
             )
+            
         except discord.Forbidden:
+            print(f"[ERROR] Cannot send DM to user {ctx.author.id} - DMs are disabled")
             await loading_message.delete()
             return await ctx.reply(
                 embed=discord.Embed(
                     title=":warning: DMs Disabled",
-                    description="Please enable DMs to receive deposit instructions.",
+                    description="Please enable DMs to receive deposit instructions.\n\nTo enable DMs:\n1. Right-click on the server name\n2. Select 'Privacy Settings'\n3. Enable 'Direct Messages'",
                     color=0xFFA500
                 )
             )
+        except Exception as e:
+            print(f"[ERROR] Failed to send deposit information via DM: {str(e)}")
+            
+            # If we can't DM, send it in the channel instead (with warning)
+            await loading_message.delete()
+            warning_embed = discord.Embed(
+                title=":warning: Could Not Send DM",
+                description="I couldn't send you a DM with the deposit details. Here they are instead:",
+                color=0xFFA500
+            )
+            await ctx.reply(embed=warning_embed)
+            
+            # Create a simpler embed without the file attachment for fallback in channel
+            fallback_embed = discord.Embed(
+                title="💎 Deposit Information",
+                description="**Please copy this information carefully:**",
+                color=0x2B2D31
+            )
+            fallback_embed.add_field(
+                name="Deposit Amount",
+                value=f"Send **{converted_amount:.6f} {currency}**",
+                inline=False
+            )
+            fallback_embed.add_field(
+                name="Deposit Address",
+                value=f"```{deposit_address}```",
+                inline=False
+            )
+            fallback_embed.add_field(
+                name="Tokens to be Received",
+                value=f"**{tokens_to_be_received:.2f} tokens**",
+                inline=False
+            )
+            fallback_embed.set_footer(text="BetSync Casino • Secure Transactions")
+            
+            # Send fallback embed in channel
+            await ctx.reply(embed=fallback_embed, view=view)
 
         # Mark the deposit as pending (store order_id and original USD amount)
         self.pending_deposits[ctx.author.id] = {
