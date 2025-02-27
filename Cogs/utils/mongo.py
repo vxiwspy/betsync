@@ -67,5 +67,5 @@ class Servers:
         if self.collection.count_documents({"server_id": server_id}):
             return False
         else:
-            new_server_ = self.collection.insert_one({dump}) 
+            new_server_ = self.collection.insert_one(dump) 
             return self.collection.find_one({"server_id": server_id})
