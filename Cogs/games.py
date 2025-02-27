@@ -414,8 +414,8 @@ class Games(commands.Cog):
                         "Click **Cash Out** before it crashes to win!"
                     )
                     
-                    # Update the message with new graph
-                    await message.edit(embed=embed, attachments=[file], view=view)
+                    # Update the message with new graph - use files parameter instead of attachments
+                    await message.edit(embed=embed, files=[file], view=view)
                 except Exception as graph_error:
                     print(f"Error updating graph: {graph_error}")
                     # Simple fallback in case graph generation fails
@@ -458,9 +458,10 @@ class Games(commands.Cog):
                     
                     # Add to history
                     history_entry = {
-                        "type": "game_loss",
+                        "type": "loss",
                         "game": "crash",
                         "bet": bet_amount,
+                        "amount": bet_amount,
                         "multiplier": round(multiplier, 2),
                         "timestamp": int(time.time())
                     }
@@ -479,7 +480,7 @@ class Games(commands.Cog):
                     play_again_view = PlayAgainView(self, ctx, bet_amount)
                     
                     # Update message with crash result
-                    await message.edit(embed=embed, attachments=[file], view=view)
+                    await message.edit(embed=embed, files=[file], view=view)
                     
                     # Add a Play Again message
                     play_again_embed = discord.Embed(
@@ -539,9 +540,10 @@ class Games(commands.Cog):
                     
                     # Add to history
                     history_entry = {
-                        "type": "game_win",
+                        "type": "win",
                         "game": "crash",
                         "bet": bet_amount,
+                        "amount": winnings,
                         "multiplier": round(cash_out_multiplier, 2),
                         "winnings": winnings,
                         "timestamp": int(time.time())
@@ -561,7 +563,7 @@ class Games(commands.Cog):
                     play_again_view = PlayAgainView(self, ctx, bet_amount)
                     
                     # Update message with win result
-                    await message.edit(embed=embed, attachments=[file], view=view)
+                    await message.edit(embed=embed, files=[file], view=view)
                     
                     # Add a Play Again message
                     play_again_embed = discord.Embed(
@@ -816,7 +818,7 @@ class Games(commands.Cog):
                 spine.set_visible(False)
             
             # Add subtle BetSync watermark/branding
-            # Add BetSync watermark without patheffects
+            # Add BetSync watermark
             plt.text(0.5, 0.03, "BetSync Casino", transform=plt.gca().transAxes,
                     color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center')
             
