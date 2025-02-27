@@ -194,7 +194,7 @@ class Games(commands.Cog):
                 else:
                     bet_amount_value = float(bet_amount)
 
-            bet_amount_value = int(bet_amount_value)  # Convert to integer
+            bet_amount_value = float(bet_amount_value)  # Keep as float to support decimals
 
             if bet_amount_value <= 0:
                 await loading_message.delete()
@@ -416,7 +416,7 @@ class Games(commands.Cog):
                         cash_out_event.set()
 
                         # Send immediate feedback to player
-                        winnings = int(bet_amount * crash_game.cash_out_multiplier)
+                        winnings = round(bet_amount * crash_game.cash_out_multiplier, 2)  # Round to 2 decimal places
                         feedback_embed = discord.Embed(
                             title="✅ Cash Out Successful!",
                             description=f"You cashed out at **{crash_game.cash_out_multiplier:.2f}x**\nWinnings: **{winnings} credits**",
@@ -587,7 +587,7 @@ class Games(commands.Cog):
                 try:
                     # User cashed out successfully
                     cash_out_multiplier = crash_game.cash_out_multiplier
-                    winnings = int(bet_amount * cash_out_multiplier)
+                    winnings = round(bet_amount * cash_out_multiplier, 2)  # Round to 2 decimal places
                     profit = winnings - bet_amount
 
                     # Generate success graph
