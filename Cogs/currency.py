@@ -230,7 +230,11 @@ class Deposit(commands.Cog):
         Create a SimpleSwap exchange transaction and return the full JSON response.
         """
         import time
+        import traceback
         start_time = time.time()
+        
+        print(f"\n[DEBUG-DEPOSIT] === STARTING DEPOSIT PROCESS ===")
+        print(f"[DEBUG-DEPOSIT] Currency: {currency}, Amount: {amount}")
         
         personal_address = "GRTDJ7BFUWZYL5344ZD4KUWVALVKSBR4LNY62PRCL5E4664QHM4C4YLNFQ"
         url = f"https://api.simpleswap.io/v1/create_exchange?api_key={self.api_key}"
@@ -241,42 +245,106 @@ class Deposit(commands.Cog):
             "address_to": personal_address,
             "fixed": False
         }
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
         
-        print(f"[DEBUG] Sending request to: {url}")
-        print(f"[DEBUG] Payload: {payload}")
+        print(f"[DEBUG-DEPOSIT] API Key (first 4 chars): {self.api_key[:4]}***")
+        print(f"[DEBUG-DEPOSIT] Sending request to: {url}")
+        print(f"[DEBUG-DEPOSIT] Payload: {payload}")
+        print(f"[DEBUG-DEPOSIT] Headers: {headers}")
         
         try:
-            response = requests.post(url, json=payload, headers=headers)
-            print(f"[DEBUG] Status code: {response.status_code}")
-            print(f"[DEBUG] Response headers: {response.headers}")
+            print(f"[DEBUG-DEPOSIT] Making API request...")
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            print(f"[DEBUG-DEPOSIT] Status code: {response.status_code}")
+            print(f"[DEBUG-DEPOSIT] Response headers: {response.headers}")
+            print(f"[DEBUG-DEPOSIT] Raw response: {response.text[:500]}")  # Print first 500 chars to avoid flooding logs
             
             if response.status_code != 200:
-                print(f"[ERROR] API returned status code {response.status_code}: {response.text}")
+                print(f"[ERROR-DEPOSIT] API returned status code {response.status_code}: {response.text}")
                 return None
+
+    def test_api_connection(self):
+        """
+        Test the SimpleSwap API connection with a minimal request to diagnose issues.
+        """
+        print(f"[DEBUG-TEST] Testing SimpleSwap API connection...")
+        test_url = f"https://api.simpleswap.io/v1/get_all_currencies?api_key={self.api_key}"
+        
+        try:
+            response = requests.get(test_url, timeout=10)
+            print(f"[DEBUG-TEST] Test API status code: {response.status_code}")
+            
+            if response.status_code == 200:
+                print(f"[DEBUG-TEST] API connection successful")
+                try:
+                    data = response.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        print(f"[DEBUG-TEST] API returned a list of {len(data)} currencies")
+                    else:
+                        print(f"[DEBUG-TEST] API returned unexpected data format: {data}")
+                except Exception as e:
+                    print(f"[DEBUG-TEST] Cannot parse API response: {str(e)}")
+            else:
+                print(f"[ERROR-TEST] API test failed with status code {response.status_code}: {response.text}")
+                
+            # Check specific currency support
+            if self.target_currency == "usdcalgo":
+                print(f"[DEBUG-TEST] Checking if target currency '{self.target_currency}' is supported...")
+                currency_check_url = f"https://api.simpleswap.io/v1/get_pairs?api_key={self.api_key}&fixed=false&currency_from=btc"
+                currency_response = requests.get(currency_check_url, timeout=10)
+                
+                if currency_response.status_code == 200:
+                    pairs = currency_response.json()
+                    if self.target_currency in pairs:
+                        print(f"[DEBUG-TEST] Target currency '{self.target_currency}' is supported")
+                    else:
+                        print(f"[ERROR-TEST] Target currency '{self.target_currency}' is NOT in the supported pairs list")
+                        print(f"[DEBUG-TEST] First 10 supported pairs: {pairs[:10]}")
+                else:
+                    print(f"[ERROR-TEST] Could not check currency pairs: {currency_response.status_code}")
+            
+        except Exception as e:
+            print(f"[ERROR-TEST] API test failed with exception: {str(e)}")
+
+
                 
             try:
+                print(f"[DEBUG-DEPOSIT] Parsing JSON response...")
                 data = response.json()
-                print(f"[DEBUG] create_exchange response: {data}")
+                print(f"[DEBUG-DEPOSIT] Parsed JSON: {data}")
                 
                 if isinstance(data, dict) and "address_from" in data:
-                    print(f"[SUCCESS] Deposit address generated: {data['address_from']}")
+                    print(f"[SUCCESS-DEPOSIT] Address generated: {data['address_from']}")
                     return data
                 elif isinstance(data, dict) and "message" in data:
-                    print(f"[ERROR] API error message: {data['message']}")
+                    print(f"[ERROR-DEPOSIT] API error message: {data['message']}")
                     return None
                 else:
-                    print(f"[ERROR] Missing 'address_from' in response: {data}")
+                    print(f"[ERROR-DEPOSIT] Missing 'address_from' in response: {data}")
+                    # Try testing the API with a minimal test call
+                    self.test_api_connection()
                     return None
-            except requests.exceptions.JSONDecodeError:
-                print(f"[ERROR] Non-JSON response: {response.text}")
+            except requests.exceptions.JSONDecodeError as json_err:
+                print(f"[ERROR-DEPOSIT] Non-JSON response: {response.text}")
+                print(f"[ERROR-DEPOSIT] JSON decode error: {str(json_err)}")
                 return None
+        except requests.exceptions.Timeout:
+            print(f"[ERROR-DEPOSIT] Request timeout - API server may be slow or unresponsive")
+            return None
+        except requests.exceptions.ConnectionError:
+            print(f"[ERROR-DEPOSIT] Connection error - Check your internet connection")
+            return None
         except Exception as e:
-            print(f"[ERROR] Exception during API request: {str(e)}")
+            print(f"[ERROR-DEPOSIT] Unexpected exception: {str(e)}")
+            print(f"[ERROR-DEPOSIT] Traceback: {traceback.format_exc()}")
             return None
         finally:
             end_time = time.time()
-            print(f"[TIMING] SimpleSwap API request took {end_time - start_time:.2f} seconds")
+            print(f"[TIMING-DEPOSIT] SimpleSwap API request took {end_time - start_time:.2f} seconds")
+            print(f"[DEBUG-DEPOSIT] === DEPOSIT PROCESS COMPLETED ===\n")
 
     # Cooldown is now handled directly in the command
     # This listener is no longer needed as we apply cooldown manually
@@ -372,16 +440,26 @@ class Deposit(commands.Cog):
             ))
 
         # Create exchange and get deposit info
+        print(f"[DEBUG-CMD] Attempting to get deposit data for {currency} (code: {self.supported_currencies[currency]}) - Amount: {amount}")
         deposit_data = self.get_deposit_data(self.supported_currencies[currency], amount)
+        
         if not deposit_data:
+            # Test the API connection before giving up
+            print(f"[DEBUG-CMD] Deposit data fetch failed. Testing API connection...")
+            self.test_api_connection()
+            
             await loading_message.delete()
-            return await ctx.reply(
-                embed=discord.Embed(
-                    title="<:no:1344252518305234987> | Deposit Error",
-                    description="Failed to fetch deposit address. Try again later.",
-                    color=0xFF0000
-                )
+            error_embed = discord.Embed(
+                title="<:no:1344252518305234987> | Deposit Error",
+                description="Failed to fetch deposit address. This could be due to:\n\n" +
+                           "• API service might be down\n" +
+                           "• Network connectivity issues\n" +
+                           "• Minimum deposit amount may have changed\n\n" +
+                           "Please try again later or contact support.",
+                color=0xFF0000
             )
+            error_embed.set_footer(text="Error details have been logged for the administrator")
+            return await ctx.reply(embed=error_embed)
         deposit_address = deposit_data.get("address_from")
         order_id = deposit_data.get("id")  # Capture the order ID from SimpleSwap
         if not deposit_address or not order_id:
