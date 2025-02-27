@@ -610,11 +610,16 @@ class Deposit(commands.Cog):
             print(f"[ERROR] Checking payment status: {e}")
             return {"received": False, "amount": 0.0}
 
-    # This method is no longer needed as registration is handled by the global check
-    # Keeping this empty method to avoid any potential issues
     @dep.before_invoke
     async def before(self, ctx):
-        pass
+        loading_emoji = emoji()["loading"]
+        db = Users()
+        if db.fetch_user(ctx.author.id) != False:
+            pass
+        else:
+            print(f"{Fore.YELLOW}[~] {Fore.WHITE}New User Detected... {Fore.BLACK}{ctx.author.id}{Fore.WHITE} {Fore.YELLOW}")
+            dump = {"discord_id": ctx.author.id, "tokens": 0, "credits": 0, "history": [], "total_deposit_amount": 0, "total_withdraw_amount": 0, "total_spent": 0, "total_earned": 0, 'total_played': 0, 'total_won': 0, 'total_lost':0}
+            db.register_new_user(dump)
 
 def setup(bot):
     bot.add_cog(Deposit(bot))
