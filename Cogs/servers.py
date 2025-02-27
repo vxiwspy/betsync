@@ -828,6 +828,52 @@ class ServersCog(commands.Cog):
 
         await ctx.reply(embed=embed)
         
+    @commands.command(aliases=["ad", "gw", "giveaway"])
+    async def airdrop(self, ctx, amount=None, currency_type=None, duration=None):
+        """
+        Create an airdrop to distribute tokens or credits to participants
+        Usage: !airdrop <amount> [t/c] [duration_in_seconds]
+        """
+        # If no arguments provided or incorrectly formatted, show usage
+        if amount is None:
+            await self.show_airdrop_usage(ctx)
+            return
+            
+        # Rest of airdrop command implementation
+        # [Your implementation]
+        
+    async def show_airdrop_usage(self, ctx):
+        """Show airdrop command usage information"""
+        embed = discord.Embed(
+            title="<:no:1344252518305234987> | Invalid Airdrop Format",
+            description="Please use the correct format for the airdrop command.",
+            color=0xFF0000
+        )
+        embed.add_field(
+            name=":bulb: Correct Usage",
+            value=(
+                "**Format:** `!airdrop <amount> [currency] [duration]`\n\n"
+                "**Examples:**\n"
+                "• `!airdrop 100` - Airdrop 100 tokens for 60 seconds\n"
+                "• `!airdrop 50 t 300` - Airdrop 50 tokens for 300 seconds\n"
+                "• `!airdrop 200 c 120` - Airdrop 200 credits for 120 seconds\n"
+                "• `!airdrop all` - Airdrop all your tokens for 60 seconds\n"
+                "• `!airdrop max c 180` - Airdrop all your credits for 180 seconds"
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name=":game_die: Parameters",
+            value=(
+                "• `amount`: Number or 'all'/'max'\n"
+                "• `currency`: 't' for tokens, 'c' for credits (optional)\n"
+                "• `duration`: Time in seconds, max 600 (optional)"
+            ),
+            inline=False
+        )
+        embed.set_footer(text="BetSync Casino • Aliases: !ad, !gw, !giveaway")
+        await ctx.reply(embed=embed)
+        
     @commands.command(aliases=["serverbets", "serverhistory", "sbets", "sb"])
     async def serverbethistory(self, ctx):
         """View server's bet history with filtering by category and pagination"""
