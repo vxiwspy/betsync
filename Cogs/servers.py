@@ -9,7 +9,7 @@ from Cogs.utils.emojis import emoji
 
 class AirdropButton(discord.ui.Button):
     def __init__(self, airdrop_data):
-        super().__init__(style=discord.ButtonStyle.success, label="Join Airdrop", emoji="💰")
+        super().__init__(style=discord.ButtonStyle.success, label="Join Airdrop", emoji="<:checkmark:1344252974188335206>")
         self.airdrop_data = airdrop_data
         self.participants = set()  # Store participant IDs
         
