@@ -131,8 +131,8 @@ class DepositCancelView(discord.ui.View):
 class Deposit(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.target_currency = "usdcalgo"
-        self.api_key = "d676247c-fbc2-4490-9fbf-e0e60a4e2066"
+        self.target_currency = "usdcalgo"  # Target currency for deposits
+        self.api_key = "d676247c-fbc2-4490-9fbf-e0e60a4e2066"  # SimpleSwap API key
         self.supported_currencies = {
             "BTC": "btc",
             "LTC": "ltc",
@@ -142,6 +142,10 @@ class Deposit(commands.Cog):
         }
         self.pending_deposits = {}
         self.deposit_timeout = 600  # 10 minutes
+        
+        # Test the API connection on initialization
+        print("[INIT] Testing SimpleSwap API connection on startup")
+        self.test_api_connection()
 
     def get_crypto_prices(self):
         url = "https://api.coingecko.com/api/v3/simple/price"
@@ -353,6 +357,10 @@ class Deposit(commands.Cog):
         Deposit command: !dep <currency> <amount in USD>
         Example: !dep BTC 50
         """
+        # Test API connection before continuing
+        print(f"[DEBUG] Testing API connection before generating deposit")
+        self.test_api_connection()
+        
         # Immediately send loading embed
         loading_embed = discord.Embed(
             title="<a:loading:1344611780638412811> | Generating Deposit...",
@@ -439,21 +447,68 @@ class Deposit(commands.Cog):
 
         # Create exchange and get deposit info
         print(f"[DEBUG-CMD] Attempting to get deposit data for {currency} (code: {self.supported_currencies[currency]}) - Amount: {amount}")
-        deposit_data = self.get_deposit_data(self.supported_currencies[currency], amount)
-        
-        if not deposit_data:
-            # Test the API connection before giving up
-            print(f"[DEBUG-CMD] Deposit data fetch failed. Testing API connection...")
-            self.test_api_connection()
+        try:
+            # Set a shorter timeout for the API call
+            deposit_data = self.get_deposit_data(self.supported_currencies[currency], amount)
             
+            # Debug check - print what we received
+            print(f"[DEBUG-DEPOSIT-RESPONSE] Received response: {deposit_data}")
+            
+            if not deposit_data:
+                # Test the API connection before giving up
+                print(f"[DEBUG-CMD] Deposit data fetch failed. Testing API connection...")
+                self.test_api_connection()
+                
+                # Try again with a different API endpoint format
+                print(f"[DEBUG-CMD] Trying alternative API endpoint format...")
+                # Update target currency to properly formatted version
+                alt_target = "usdcalgo" 
+                alt_url = f"https://api.simpleswap.io/v1/create_exchange?api_key={self.api_key}"
+                alt_payload = {
+                    "currency_from": self.supported_currencies[currency],
+                    "currency_to": alt_target,
+                    "amount": amount,
+                    "address_to": "GRTDJ7BFUWZYL5344ZD4KUWVALVKSBR4LNY62PRCL5E4664QHM4C4YLNFQ",
+                    "fixed": False
+                }
+                headers = {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+                
+                print(f"[DEBUG-FALLBACK] Making fallback API request to {alt_url}")
+                print(f"[DEBUG-FALLBACK] Payload: {alt_payload}")
+                
+                response = requests.post(alt_url, json=alt_payload, headers=headers, timeout=30)
+                print(f"[DEBUG-FALLBACK] Status code: {response.status_code}")
+                print(f"[DEBUG-FALLBACK] Response text: {response.text}")
+                
+                if response.status_code == 200:
+                    try:
+                        deposit_data = response.json()
+                        print(f"[DEBUG-FALLBACK] Successfully got data: {deposit_data}")
+                    except Exception as e:
+                        print(f"[DEBUG-FALLBACK] JSON parsing error: {str(e)}")
+                
+            if not deposit_data:
+                await loading_message.delete()
+                error_embed = discord.Embed(
+                    title="<:no:1344252518305234987> | Deposit Error",
+                    description="Failed to fetch deposit address. This could be due to:\n\n" +
+                               "• API service might be down\n" +
+                               "• Network connectivity issues\n" +
+                               "• Minimum deposit amount may have changed\n\n" +
+                               "Please try again later or contact support.",
+                    color=0xFF0000
+                )
+                error_embed.set_footer(text="Error details have been logged for the administrator")
+                return await ctx.reply(embed=error_embed)
+        except Exception as e:
+            print(f"[ERROR-CRITICAL] Exception during deposit data fetch: {str(e)}")
             await loading_message.delete()
             error_embed = discord.Embed(
                 title="<:no:1344252518305234987> | Deposit Error",
-                description="Failed to fetch deposit address. This could be due to:\n\n" +
-                           "• API service might be down\n" +
-                           "• Network connectivity issues\n" +
-                           "• Minimum deposit amount may have changed\n\n" +
-                           "Please try again later or contact support.",
+                description=f"An error occurred while processing your deposit request:\n```{str(e)}```\nPlease try again later or contact support.",
                 color=0xFF0000
             )
             error_embed.set_footer(text="Error details have been logged for the administrator")
