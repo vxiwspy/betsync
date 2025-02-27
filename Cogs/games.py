@@ -479,16 +479,24 @@ class Games(commands.Cog):
                     # Create Play Again view
                     play_again_view = PlayAgainView(self, ctx, bet_amount)
                     
-                    # Update message with crash result
-                    await message.edit(embed=embed, files=[file], view=view)
-                    
-                    # Add a Play Again message
-                    play_again_embed = discord.Embed(
-                        title="🎮 Play Again?",
-                        description=f"Want to try your luck again with **{bet_amount}**?",
-                        color=0x2B2D31
+                    # Add Play Again button to the same view
+                    play_again_button = discord.ui.Button(
+                        label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄"
                     )
-                    await ctx.send(embed=play_again_embed, view=play_again_view)
+                    
+                    async def play_again_callback(interaction):
+                        if interaction.user.id != ctx.author.id:
+                            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+                        
+                        # Start a new game with the same bet
+                        await interaction.response.defer()
+                        await self.crash(ctx, str(bet_amount))
+                    
+                    play_again_button.callback = play_again_callback
+                    view.add_item(play_again_button)
+                    
+                    # Update message with crash result and Play Again button
+                    await message.edit(embed=embed, files=[file], view=view)
                     
                 except Exception as crash_error:
                     print(f"Error handling crash: {crash_error}")
@@ -503,16 +511,24 @@ class Games(commands.Cog):
                             ),
                             color=0xFF0000
                         )
-                        await message.edit(embed=embed, view=view)
-                        
-                        # Still try to add Play Again option
-                        play_again_view = PlayAgainView(self, ctx, bet_amount)
-                        play_again_embed = discord.Embed(
-                            title="🎮 Play Again?",
-                            description=f"Want to try your luck again with **{bet_amount}**?",
-                            color=0x2B2D31
+                        # Add Play Again button to the view
+                        play_again_button = discord.ui.Button(
+                            label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄"
                         )
-                        await ctx.send(embed=play_again_embed, view=play_again_view)
+                        
+                        async def play_again_callback(interaction):
+                            if interaction.user.id != ctx.author.id:
+                                return await interaction.response.send_message("This is not your game!", ephemeral=True)
+                            
+                            # Start a new game with the same bet
+                            await interaction.response.defer()
+                            await self.crash(ctx, str(bet_amount))
+                        
+                        play_again_button.callback = play_again_callback
+                        view.add_item(play_again_button)
+                        
+                        # Update message with the view containing Play Again button
+                        await message.edit(embed=embed, view=view)
                         
                     except Exception as fallback_error:
                         print(f"Error updating fallback crash message: {fallback_error}")
@@ -559,19 +575,24 @@ class Games(commands.Cog):
                         {"$inc": {"total_won": 1, "total_earned": winnings}}
                     )
                     
-                    # Create Play Again view
-                    play_again_view = PlayAgainView(self, ctx, bet_amount)
-                    
-                    # Update message with win result
-                    await message.edit(embed=embed, files=[file], view=view)
-                    
-                    # Add a Play Again message
-                    play_again_embed = discord.Embed(
-                        title="🎮 Play Again?",
-                        description=f"Want to try your luck again with **{bet_amount}**?",
-                        color=0x2B2D31
+                    # Create Play Again button
+                    play_again_button = discord.ui.Button(
+                        label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄"
                     )
-                    await ctx.send(embed=play_again_embed, view=play_again_view)
+                    
+                    async def play_again_callback(interaction):
+                        if interaction.user.id != ctx.author.id:
+                            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+                        
+                        # Start a new game with the same bet
+                        await interaction.response.defer()
+                        await self.crash(ctx, str(bet_amount))
+                    
+                    play_again_button.callback = play_again_callback
+                    view.add_item(play_again_button)
+                    
+                    # Update message with win result and Play Again button
+                    await message.edit(embed=embed, files=[file], view=view)
                     
                 except Exception as win_error:
                     print(f"Error handling win: {win_error}")
@@ -587,19 +608,27 @@ class Games(commands.Cog):
                             ),
                             color=0x00FF00
                         )
-                        await message.edit(embed=embed, view=view)
+                        # Add Play Again button to the view
+                        play_again_button = discord.ui.Button(
+                            label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄"
+                        )
+                        
+                        async def play_again_callback(interaction):
+                            if interaction.user.id != ctx.author.id:
+                                return await interaction.response.send_message("This is not your game!", ephemeral=True)
+                            
+                            # Start a new game with the same bet
+                            await interaction.response.defer()
+                            await self.crash(ctx, str(bet_amount))
+                        
+                        play_again_button.callback = play_again_callback
+                        view.add_item(play_again_button)
                         
                         # Make sure winnings are credited even if graph fails
                         db.update_balance(ctx.author.id, winnings, "credits", "$inc")
                         
-                        # Still try to add Play Again option
-                        play_again_view = PlayAgainView(self, ctx, bet_amount)
-                        play_again_embed = discord.Embed(
-                            title="🎮 Play Again?",
-                            description=f"Want to try your luck again with **{bet_amount}**?",
-                            color=0x2B2D31
-                        )
-                        await ctx.send(embed=play_again_embed, view=play_again_view)
+                        # Update message with view containing Play Again button
+                        await message.edit(embed=embed, view=view)
                         
                     except Exception as fallback_error:
                         print(f"Error updating fallback win message: {fallback_error}")
