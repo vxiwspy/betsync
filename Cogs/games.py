@@ -416,10 +416,10 @@ class Games(commands.Cog):
                         cash_out_event.set()
 
                         # Send immediate feedback to player
-                        winnings = round(bet_amount * crash_game.cash_out_multiplier, 2)  # Round to 2 decimal places
+                        winnings = round(bet_amount * crash_game.cash_out_multiplier, 3)  # Round to 3 decimal places
                         feedback_embed = discord.Embed(
                             title="✅ Cash Out Successful!",
-                            description=f"You cashed out at **{crash_game.cash_out_multiplier:.2f}x**\nWinnings: **{winnings} credits**",
+                            description=f"You cashed out at **{crash_game.cash_out_multiplier:.3f}x**\nWinnings: **{winnings} credits**",
                             color=0x00FF00
                         )
                         await ctx.send(embed=feedback_embed, delete_after=5)
@@ -454,7 +454,7 @@ class Games(commands.Cog):
                     embed.title = "🚀 | Crash Game In Progress"
                     embed.description = (
                         f"{bet_description}\n"
-                        f"**Current Multiplier:** {multiplier:.2f}x\n\n"
+                        f"**Current Multiplier:** {multiplier:.3f}x\n\n"
                         "React with 💰 to cash out before it crashes!"
                     )
 
@@ -514,7 +514,7 @@ class Games(commands.Cog):
                         "game": "crash",
                         "bet": bet_amount,
                         "amount": bet_amount,
-                        "multiplier": round(multiplier, 2),
+                        "multiplier": round(multiplier, 3),
                         "timestamp": int(time.time())
                     }
                     db.collection.update_one(
@@ -587,7 +587,7 @@ class Games(commands.Cog):
                 try:
                     # User cashed out successfully
                     cash_out_multiplier = crash_game.cash_out_multiplier
-                    winnings = round(bet_amount * cash_out_multiplier, 2)  # Round to 2 decimal places
+                    winnings = round(bet_amount * cash_out_multiplier, 3)  # Round to 3 decimal places
                     profit = winnings - bet_amount
 
                     # Generate success graph
@@ -610,7 +610,7 @@ class Games(commands.Cog):
                         "game": "crash",
                         "bet": bet_amount,
                         "amount": winnings,
-                        "multiplier": round(cash_out_multiplier, 2),
+                        "multiplier": round(cash_out_multiplier, 3),
                         "winnings": winnings,
                         "timestamp": int(time.time())
                     }
@@ -837,7 +837,7 @@ class Games(commands.Cog):
                             color='red', alpha=0.6, linewidth=1.5, zorder=9)
 
                 # Add crash text without shadow effect
-                plt.text(current_multiplier, current_multiplier + 0.3, f"CRASHED AT {current_multiplier:.2f}x", 
+                plt.text(current_multiplier, current_multiplier + 0.3, f"CRASHED AT {current_multiplier:.3f}x", 
                          color='white', fontweight='bold', fontsize=14, ha='right', va='bottom',
                          bbox=dict(boxstyle="round,pad=0.3", facecolor='red', alpha=0.8, edgecolor='darkred'))
 
@@ -856,7 +856,7 @@ class Games(commands.Cog):
                         color='white', alpha=0.8, linewidth=1.5, zorder=11)
 
                 # Add cash out text without shadow effect
-                plt.text(current_multiplier, current_multiplier + 0.3, f"CASHED OUT AT {current_multiplier:.2f}x", 
+                plt.text(current_multiplier, current_multiplier + 0.3, f"CASHED OUT AT {current_multiplier:.3f}x", 
                          color='white', fontweight='bold', fontsize=14, ha='right', va='bottom',
                          bbox=dict(boxstyle="round,pad=0.3", facecolor='green', alpha=0.8, edgecolor='darkgreen'))
 
@@ -865,12 +865,12 @@ class Games(commands.Cog):
             if not crashed and not cash_out:
                 # Add glowing effect around the multiplier text
                 for i, alpha in zip(range(3), [0.1, 0.07, 0.04]):
-                    plt.text(0.95, 0.95, f"{current_multiplier:.2f}x", 
+                    plt.text(0.95, 0.95, f"{current_multiplier:.3f}x", 
                              transform=plt.gca().transAxes, color='white', fontsize=22+i, fontweight='bold', 
                              ha='right', va='top', alpha=alpha)
 
                 # Main multiplier text
-                plt.text(0.95, 0.95, f"{current_multiplier:.2f}x", 
+                plt.text(0.95, 0.95, f"{current_multiplier:.3f}x", 
                          transform=plt.gca().transAxes, color='white', fontsize=22, fontweight='bold', 
                          ha='right', va='top',
                          bbox=dict(boxstyle="round,pad=0.3", facecolor=line_color, alpha=0.8, edgecolor='white', linewidth=1))
