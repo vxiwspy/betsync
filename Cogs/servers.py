@@ -193,7 +193,7 @@ class ServersCog(commands.Cog):
 
         await ctx.reply(embed=embed)
         
-    @commands.command(aliases=["serverbets", "serverhistory", "sbets"])
+    @commands.command(aliases=["serverbets", "serverhistory", "sbets", "sb"])
     async def serverbethistory(self, ctx):
         """View server's bet history with filtering by category and pagination"""
         # Send loading embed first
