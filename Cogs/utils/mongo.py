@@ -69,3 +69,24 @@ class Servers:
         else:
             new_server_ = self.collection.insert_one(dump) 
             return self.collection.find_one({"server_id": server_id})
+            
+    def update_server_profit(self, server_id, profit_amount):
+        """
+        Updates the total profit value for a server.
+        
+        Args:
+            server_id: The ID of the server to update
+            profit_amount: The amount to add to the total profit (negative for player wins)
+        
+        Returns:
+            bool: True if the update was successful, False otherwise
+        """
+        try:
+            self.collection.update_one(
+                {"server_id": server_id},
+                {"$inc": {"total_profit": profit_amount}}
+            )
+            return True
+        except Exception as e:
+            print(f"Error updating server profit: {e}")
+            return False

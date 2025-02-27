@@ -625,6 +625,12 @@ class CrashCog(commands.Cog):
                     )
                     embed.color = 0x00FF00
 
+                    # Update server profit (negative value because server loses when player wins)
+                    from Cogs.utils.mongo import Servers
+                    servers_db = Servers()
+                    server_profit = -profit  # Server loses money when player wins
+                    servers_db.update_server_profit(ctx.guild.id, server_profit)
+                    
                     # Add credits to user balance
                     db.update_balance(ctx.author.id, winnings, "credits", "$inc")
 
@@ -648,6 +654,12 @@ class CrashCog(commands.Cog):
                         {"discord_id": ctx.author.id},
                         {"$inc": {"total_won": 1, "total_earned": winnings}}
                     )
+                    
+                    # Update server profit (negative value because server loses when player wins)
+                    from Cogs.utils.mongo import Servers
+                    servers_db = Servers()
+                    server_profit = -profit  # Server loses money when player wins
+                    servers_db.update_server_profit(ctx.guild.id, server_profit)
 
                     # Create Play Again view with button
                     play_again_view = discord.ui.View()
