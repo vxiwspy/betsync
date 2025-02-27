@@ -38,8 +38,6 @@ class HistoryView(discord.ui.View):
         self.add_item(discord.ui.Button(label="Withdrawals", style=discord.ButtonStyle.primary if self.category == "withdraw" else discord.ButtonStyle.secondary, custom_id="withdraw"))
         self.add_item(discord.ui.Button(label="Wins", style=discord.ButtonStyle.primary if self.category == "win" else discord.ButtonStyle.secondary, custom_id="win"))
         self.add_item(discord.ui.Button(label="Losses", style=discord.ButtonStyle.primary if self.category == "loss" else discord.ButtonStyle.secondary, custom_id="loss"))
-        self.add_item(discord.ui.Button(label="Tips", style=discord.ButtonStyle.primary if self.category == "tip" else discord.ButtonStyle.secondary, custom_id="tip")) # Added tip button
-
 
         # Add pagination buttons
         self.add_item(discord.ui.Button(emoji="⬅️", style=discord.ButtonStyle.secondary, custom_id="prev", disabled=self.page == 0))
@@ -103,9 +101,6 @@ class HistoryView(discord.ui.View):
                 elif item.get("type") == "loss":
                     field_name = f"❌ Loss • {item.get('game', 'Game')} • {date_str}"
                     field_value = f"Lost **{item.get('amount', 0):,.2f} tokens**"
-                elif item.get("type") == "tip": #Added tip handling
-                    field_name = f"🎁 Tip • {date_str}"
-                    field_value = f"Received **{item.get('amount', 0):,.2f} tokens**" #Assumed tip is in tokens. Adjust as needed.
                 else:
                     field_name = f"🔄 Transaction • {date_str}"
                     field_value = f"Amount: **{item.get('amount', 0):,.2f}**"
@@ -159,9 +154,6 @@ class HistoryView(discord.ui.View):
         elif custom_id == "withdraw":
             self.category = "withdraw"
             self.page = 0
-        elif custom_id == "tip":
-            self.category = "tip"
-            self.page = 0
         elif custom_id == "win":
             self.category = "win"
             self.page = 0
@@ -199,9 +191,6 @@ class HistoryView(discord.ui.View):
             self.page = 0
         elif custom_id == "withdraw":
             self.category = "withdraw"
-            self.page = 0
-        elif custom_id == "tip":
-            self.category = "tip"
             self.page = 0
         elif custom_id == "win":
             self.category = "win"
