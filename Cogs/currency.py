@@ -252,20 +252,10 @@ class Deposit(commands.Cog):
             print(f"[ERROR] Non-JSON response: {response.text}")
             return None
 
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandOnCooldown) and ctx.command.name in ['dep', 'depo']:
-            retry_after = int(error.retry_after)
-            current_time = int(time.time())
-            embed = discord.Embed(
-                title="<:no:1344252518305234987> | DEPOSIT COOLDOWN",
-                description=f"You're on cooldown!\nPlease wait **{retry_after}** seconds.\nTry again <t:{current_time + retry_after}:R>",
-                color=discord.Color.red()
-            )
-            await ctx.reply(embed=embed)
+    # Cooldown is now handled directly in the command
+    # This listener is no longer needed as we apply cooldown manually
 
-    @commands.command(aliases=["depo"])
-    @commands.cooldown(1, 600, commands.BucketType.user)  # 10 minute cooldown
+    @commands.command(aliases=["depo", "deposit"])
     async def dep(self, ctx, currency: str = None, amount: float = None):
         """
         Deposit command: !dep <currency> <amount in USD>
@@ -312,7 +302,12 @@ class Deposit(commands.Cog):
                 name=":pushpin: Supported Currencies",
                 value="BTC, LTC, SOL, ETH, USDT (ERC20)"
             )
+            # Do not trigger cooldown if user is just checking usage
+            await loading_message.delete()
             return await ctx.reply(embed=usage_embed)
+            
+        # Apply cooldown only when actually starting a deposit
+        self.dep._buckets.get_bucket(ctx).update_rate_limit()
 
         currency = currency.upper()
         if currency not in self.supported_currencies:
