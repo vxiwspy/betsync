@@ -533,6 +533,9 @@ class CrashCog(commands.Cog):
                     embed.color = 0xFF0000
 
                     # Add to history
+                    from Cogs.utils.mongo import Servers
+                    db = Servers()
+                    db.update_server_profit(ctx.guild.id, bet_amount)
                     history_entry = {
                         "type": "loss",
                         "game": "crash",

@@ -90,3 +90,13 @@ class Servers:
         except Exception as e:
             print(f"Error updating server profit: {e}")
             return False
+
+    def update_history(self, server_id, history_data):
+            if self.collection.count_documents({"server_id": server_id}):
+                self.collection.update_one(
+                    {"server_id": server_id},
+                    {"$push": {"server_bet_history": history_data}}
+                )
+                return True
+            else:
+                return False

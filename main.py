@@ -26,7 +26,8 @@ async def on_guild_join(guild):
         "server_name": guild.name,
         "total_profit": 0,
         "giveaway_channel": None,
-        "server_admins": []
+        "server_admins": [],
+        "server_bet_history": [],
     }
     resp = db.new_server(dump)
     if not resp:
