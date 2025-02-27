@@ -45,19 +45,10 @@ class Users:
             return False
 
 class Servers:
-    _instance = None
-    _client = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(Servers, cls).__new__(cls)
-            cls._client = MongoClient(os.environ["MONGO"])
-            return cls._instance
 
     def __init__(self):
-        if not hasattr(self, 'db'):
-            self.db = self._client["BetSync"]
-            self.collection = self.db["servers"]
+        self.db = mongodb["BetSync"]
+        self.collection = self.db["servers"]
 
     def get_total_all_servers(self):
         return self.collection.count_documents({})

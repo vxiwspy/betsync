@@ -138,7 +138,7 @@ class Tip(commands.Cog):
         
         # Add to recipient
         recipient_balance = recipient_data.get(db_field, 0)
-        db.update_balance(recipient.id, recipient_balance + amount, db_field, "$set")
+        db.update_balance(recipient.id, recipient_balance + amount, "tokens", "$set")
         
         # Record in history for both users
         timestamp = int(datetime.datetime.now().timestamp())
