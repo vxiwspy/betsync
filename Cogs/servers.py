@@ -839,8 +839,264 @@ class ServersCog(commands.Cog):
             await self.show_airdrop_usage(ctx)
             return
             
-        # Rest of airdrop command implementation
-        # [Your implementation]
+        # Send loading message
+        loading_emoji = emoji()["loading"]
+        loading_embed = discord.Embed(
+            title=f"{loading_emoji} | Creating Airdrop...",
+            description="Please wait while we process your request.",
+            color=0x00FFAE
+        )
+        loading_message = await ctx.reply(embed=loading_embed)
+        
+        # Check if user already has an active airdrop
+        if hasattr(self, 'active_airdrops') and ctx.author.id in self.active_airdrops:
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Active Airdrop",
+                description="You already have an active airdrop. Please wait for it to finish.",
+                color=0xFF0000
+            )
+            await loading_message.delete()
+            return await ctx.reply(embed=embed)
+            
+        # Initialize active_airdrops dict if not already exists
+        if not hasattr(self, 'active_airdrops'):
+            self.active_airdrops = {}
+        
+        # Get user data from database
+        db = Users()
+        user_data = db.fetch_user(ctx.author.id)
+        
+        if not user_data:
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Account Required",
+                description="You need an account to create an airdrop. Please wait for auto-registration or use `!signup`.",
+                color=0xFF0000
+            )
+            await loading_message.delete()
+            return await ctx.reply(embed=embed)
+            
+        # Parse amount
+        try:
+            # Handle 'all' or 'max' bet
+            if amount.lower() in ['all', 'max']:
+                tokens_balance = user_data['tokens']
+                credits_balance = user_data['credits']
+                
+                # Determine which currency to use if not specified
+                if currency_type is None:
+                    # Use tokens if available, otherwise credits
+                    if tokens_balance > 0:
+                        amount_value = tokens_balance
+                        currency_type = 't'
+                    elif credits_balance > 0:
+                        amount_value = credits_balance
+                        currency_type = 'c'
+                    else:
+                        embed = discord.Embed(
+                            title="<:no:1344252518305234987> | Insufficient Funds",
+                            description="You don't have any tokens or credits to airdrop.",
+                            color=0xFF0000
+                        )
+                        await loading_message.delete()
+                        return await ctx.reply(embed=embed)
+                elif currency_type.lower() in ['t', 'token', 'tokens']:
+                    amount_value = tokens_balance
+                    currency_type = 't'
+                elif currency_type.lower() in ['c', 'credit', 'credits']:
+                    amount_value = credits_balance
+                    currency_type = 'c'
+                else:
+                    # If currency_type is not a valid currency, it might be duration
+                    if duration is None:
+                        try:
+                            duration = int(currency_type)
+                            currency_type = None
+                            if tokens_balance > 0:
+                                amount_value = tokens_balance
+                                currency_type = 't'
+                            elif credits_balance > 0:
+                                amount_value = credits_balance
+                                currency_type = 'c'
+                            else:
+                                embed = discord.Embed(
+                                    title="<:no:1344252518305234987> | Insufficient Funds",
+                                    description="You don't have any tokens or credits to airdrop.",
+                                    color=0xFF0000
+                                )
+                                await loading_message.delete()
+                                return await ctx.reply(embed=embed)
+                        except ValueError:
+                            await loading_message.delete()
+                            return await self.show_airdrop_usage(ctx)
+                    else:
+                        await loading_message.delete()
+                        return await self.show_airdrop_usage(ctx)
+            else:
+                # Check if amount has 'k' or 'm' suffix
+                if amount.lower().endswith('k'):
+                    amount_value = float(amount[:-1]) * 1000
+                elif amount.lower().endswith('m'):
+                    amount_value = float(amount[:-1]) * 1000000
+                else:
+                    amount_value = float(amount)
+        except ValueError:
+            await loading_message.delete()
+            return await self.show_airdrop_usage(ctx)
+            
+        # Ensure amount is positive
+        if amount_value <= 0:
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Invalid Amount",
+                description="Airdrop amount must be greater than 0.",
+                color=0xFF0000
+            )
+            await loading_message.delete()
+            return await ctx.reply(embed=embed)
+            
+        # Parse currency if provided
+        if currency_type is None:
+            # Default: use tokens if available, otherwise credits
+            tokens_balance = user_data['tokens']
+            if tokens_balance >= amount_value:
+                currency_type = 't'
+            else:
+                currency_type = 'c'
+        
+        # Normalize currency type
+        if currency_type.lower() in ['t', 'token', 'tokens']:
+            db_field = 'tokens'
+            display_currency = 'tokens'
+        elif currency_type.lower() in ['c', 'credit', 'credits']:
+            db_field = 'credits'
+            display_currency = 'credits'
+        else:
+            # If currency_type is not a valid currency, it might be duration
+            if duration is None:
+                try:
+                    duration = int(currency_type)
+                    # Use tokens if available, otherwise credits
+                    tokens_balance = user_data['tokens']
+                    if tokens_balance >= amount_value:
+                        db_field = 'tokens'
+                        display_currency = 'tokens'
+                    else:
+                        db_field = 'credits'
+                        display_currency = 'credits'
+                except ValueError:
+                    await loading_message.delete()
+                    return await self.show_airdrop_usage(ctx)
+            else:
+                await loading_message.delete()
+                return await self.show_airdrop_usage(ctx)
+        
+        # Check if user has enough balance
+        user_balance = user_data.get(db_field, 0)
+        if user_balance < amount_value:
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Insufficient Funds",
+                description=f"You don't have enough {display_currency} for this airdrop. Your balance: **{user_balance:.2f} {display_currency}**\nRequired: **{amount_value:.2f} {display_currency}**",
+                color=0xFF0000
+            )
+            await loading_message.delete()
+            return await ctx.reply(embed=embed)
+            
+        # Parse duration if provided
+        if duration is None:
+            # Default: 60 seconds
+            duration_value = 60
+        else:
+            try:
+                duration_value = int(duration)
+                # Cap at 10 minutes (600 seconds)
+                duration_value = min(duration_value, 600)
+                # Minimum of 10 seconds
+                duration_value = max(duration_value, 10)
+            except ValueError:
+                await loading_message.delete()
+                return await self.show_airdrop_usage(ctx)
+        
+        # Apply service fee (1.5%)
+        service_fee = amount_value * 0.015
+        airdrop_amount = amount_value - service_fee
+        
+        # Deduct from user's balance
+        new_balance = user_balance - amount_value
+        db.update_balance(ctx.author.id, new_balance, db_field)
+        
+        # Create airdrop data
+        airdrop_data = {
+            "author_id": ctx.author.id,
+            "author_name": ctx.author.name,
+            "amount": airdrop_amount,
+            "currency": db_field,
+            "display_currency": display_currency,
+            "duration": duration_value,
+            "participants": [],
+            "start_time": int(time.time())
+        }
+        
+        # Store active airdrop
+        self.active_airdrops[ctx.author.id] = airdrop_data
+        
+        # Create embed for airdrop
+        embed = discord.Embed(
+            title="🎁 Airdrop Started!",
+            description=f"{ctx.author.mention} is giving away **{airdrop_amount:.2f} {display_currency}**!",
+            color=0x00FFAE
+        )
+        
+        # Calculate end time
+        end_time = airdrop_data["start_time"] + duration_value
+        
+        embed.add_field(
+            name="⏱️ Time Remaining",
+            value=f"Ends <t:{end_time}:R>",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="👥 Participants",
+            value="**0** users have joined",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💎 How to Join",
+            value="Click the button below to join the airdrop!",
+            inline=False
+        )
+        
+        embed.set_footer(text=f"BetSync Casino • Service Fee: {service_fee:.2f} {display_currency} (1.5%)")
+        
+        # Create view with join button
+        view = AirdropView(airdrop_data)
+        
+        # Delete loading message
+        await loading_message.delete()
+        
+        # Send airdrop message
+        airdrop_message = await ctx.send(embed=embed, view=view)
+        
+        # Schedule airdrop end handler
+        self.bot.loop.create_task(
+            self.airdrop_end_handler(ctx, airdrop_message, airdrop_data)
+        )
+        
+        # Send confirmation to airdrop creator
+        try:
+            confirm_embed = discord.Embed(
+                title="<:checkmark:1344252974188335206> | Airdrop Created",
+                description=(
+                    f"Your airdrop of **{airdrop_amount:.2f} {display_currency}** has been created!\n"
+                    f"Service fee: **{service_fee:.2f} {display_currency}** (1.5%)\n"
+                    f"Duration: **{duration_value} seconds**"
+                ),
+                color=0x00FF00
+            )
+            await ctx.author.send(embed=confirm_embed)
+        except discord.Forbidden:
+            # If we can't DM the user, just continue silently
+            pass
         
     async def show_airdrop_usage(self, ctx):
         """Show airdrop command usage information"""
@@ -874,6 +1130,140 @@ class ServersCog(commands.Cog):
         embed.set_footer(text="BetSync Casino • Aliases: !ad, !gw, !giveaway")
         await ctx.reply(embed=embed)
         
+    async def airdrop_end_handler(self, ctx, message, airdrop_data):
+        """Handle airdrop end after duration expires"""
+        try:
+            # Wait for duration
+            await asyncio.sleep(airdrop_data["duration"])
+            
+            # Get final participants
+            participants = airdrop_data["participants"]
+            participant_count = len(participants)
+            
+            # Update embed with results
+            embed = discord.Embed(
+                title="🎁 Airdrop Ended!",
+                color=0x00FFAE
+            )
+            
+            if participant_count == 0:
+                # No participants - refund the creator (minus fee)
+                db = Users()
+                creator_data = db.fetch_user(airdrop_data["author_id"])
+                if creator_data:
+                    current_balance = creator_data.get(airdrop_data["currency"], 0)
+                    new_balance = current_balance + airdrop_data["amount"]
+                    db.update_balance(airdrop_data["author_id"], new_balance, airdrop_data["currency"])
+                    
+                    embed.description = f"No one joined the airdrop. The amount has been refunded to {airdrop_data['author_name']}."
+                    
+                    # Notify creator
+                    creator = self.bot.get_user(airdrop_data["author_id"])
+                    if creator:
+                        try:
+                            refund_embed = discord.Embed(
+                                title="💰 Airdrop Refund",
+                                description=f"Your airdrop had no participants and has been refunded.\nRefunded: **{airdrop_data['amount']:.2f} {airdrop_data['display_currency']}**",
+                                color=0x00FFAE
+                            )
+                            await creator.send(embed=refund_embed)
+                        except discord.Forbidden:
+                            # Can't DM the user, just continue
+                            pass
+            else:
+                # Calculate share for each participant
+                share_amount = airdrop_data["amount"] / participant_count
+                share_amount = round(share_amount, 2)  # Round to 2 decimal places
+                
+                embed.description = (
+                    f"Airdrop by {airdrop_data['author_name']} has ended!\n"
+                    f"**{participant_count}** participants received **{share_amount:.2f} {airdrop_data['display_currency']}** each."
+                )
+                
+                # Distribute shares to participants
+                db = Users()
+                participants_notified = 0
+                
+                for participant_id in participants:
+                    participant_data = db.fetch_user(participant_id)
+                    if participant_data:
+                        # Update participant balance
+                        current_balance = participant_data.get(airdrop_data["currency"], 0)
+                        new_balance = current_balance + share_amount
+                        db.update_balance(participant_id, new_balance, airdrop_data["currency"])
+                        
+                        # Add to history
+                        history_entry = {
+                            "type": "airdrop",
+                            "amount": share_amount,
+                            "currency": airdrop_data["currency"],
+                            "from_id": airdrop_data["author_id"],
+                            "from_name": airdrop_data["author_name"],
+                            "timestamp": int(time.time())
+                        }
+                        db.collection.update_one(
+                            {"discord_id": participant_id},
+                            {"$push": {"history": {"$each": [history_entry], "$slice": -100}}}
+                        )
+                        
+                        # Notify participant
+                        participant = self.bot.get_user(participant_id)
+                        if participant:
+                            try:
+                                notify_embed = discord.Embed(
+                                    title="🎁 Airdrop Received!",
+                                    description=(
+                                        f"You received **{share_amount:.2f} {airdrop_data['display_currency']}** from "
+                                        f"{airdrop_data['author_name']}'s airdrop!"
+                                    ),
+                                    color=0x00FFAE
+                                )
+                                await participant.send(embed=notify_embed)
+                                participants_notified += 1
+                            except discord.Forbidden:
+                                # Can't DM the user, just continue
+                                pass
+                
+                # Add notification stats to embed
+                if participants_notified < participant_count:
+                    embed.add_field(
+                        name="📣 Notifications",
+                        value=f"**{participants_notified}** out of **{participant_count}** participants were notified via DM.",
+                        inline=False
+                    )
+            
+            # Update the original message
+            embed.set_footer(text="BetSync Casino • Airdrop Completed")
+            
+            # Disable buttons
+            try:
+                for item in message.view.children:
+                    item.disabled = True
+                await message.edit(embed=embed, view=message.view)
+            except:
+                # If we can't update components, try a new view
+                view = discord.ui.View()
+                for item in view.children:
+                    item.disabled = True
+                
+                await message.edit(embed=embed, view=view)
+        except Exception as e:
+            print(f"Error in airdrop_end_handler: {e}")
+            # Try to send an error message
+            try:
+                error_embed = discord.Embed(
+                    title="❌ Airdrop Error",
+                    description="There was an error processing the airdrop. Participants may not have received their rewards.",
+                    color=0xFF0000
+                )
+                await message.edit(embed=error_embed)
+            except:
+                pass
+        finally:
+            # Always remove from active airdrops
+            if airdrop_data["author_id"] in self.active_airdrops:
+                del self.active_airdrops[airdrop_data["author_id"]]
+                
     @commands.command(aliases=["serverbets", "serverhistory", "sbets", "sb"])
     async def serverbethistory(self, ctx):
         """View server's bet history with filtering by category and pagination"""
