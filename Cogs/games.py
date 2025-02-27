@@ -822,9 +822,16 @@ class Games(commands.Cog):
                 spine.set_visible(False)
             
             # Add subtle BetSync watermark/branding
-            plt.text(0.5, 0.03, "BetSync Casino", transform=plt.gca().transAxes,
-                    color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center',
-                    path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=2, foreground='black', alpha=0.2)])
+            # Add BetSync watermark with fallback for missing patheffects
+            try:
+                import matplotlib.patheffects as path_effects
+                plt.text(0.5, 0.03, "BetSync Casino", transform=plt.gca().transAxes,
+                        color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center',
+                        path_effects=[path_effects.withStroke(linewidth=2, foreground='black', alpha=0.2)])
+            except (ImportError, AttributeError):
+                # Fallback if patheffects is not available
+                plt.text(0.5, 0.03, "BetSync Casino", transform=plt.gca().transAxes,
+                        color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center')
             
             # Save plot to bytes buffer with higher quality
             buf = io.BytesIO()
