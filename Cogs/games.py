@@ -736,208 +736,170 @@ class Games(commands.Cog):
                 del self.ongoing_games[ctx.author.id]
 
     def generate_crash_graph(self, current_multiplier, crashed=False, cash_out=False):
-        """Generate a crash game graph with improved visuals"""
+        """Generate a crash game graph with Stake-like visuals"""
         try:
             # Clear and close previous plots to prevent memory issues
             plt.close('all')
             fig = plt.figure(figsize=(10, 6), dpi=100)
 
-            # Set background color with a darker theme
-            bg_color = '#1E1F22'
+            # Set dark background similar to Stake's design
+            bg_color = '#0F1923'  # Darker blue-black, similar to Stake
             plt.gca().set_facecolor(bg_color)
             plt.gcf().set_facecolor(bg_color)
 
-            # Generate x and y coordinates with more points for smoother curve
-            x = np.linspace(0, current_multiplier, 300)  # Increased for smoother curve
+            # Generate x and y coordinates for smoother curve with more points
+            # Use more points for higher multipliers to make the curve smoother
+            point_count = min(500, int(300 + current_multiplier * 20))
+            x = np.linspace(0, current_multiplier, point_count)
 
-            # Create a more dynamic curve that starts slower and grows faster
-            if current_multiplier <= 1.5:
-                # For small multipliers, use simple exponential
-                y = np.exp(x) - 1
-            else:
-                # For larger multipliers, use a combination for more dramatic curve
-                y = np.power(1.5, x) - 0.5
-
-            # Scale y values to match the current multiplier
-            y = y * (current_multiplier / y[-1])
-
-            # Use the existing figure and set its properties
+            # Create curve with exponential growth - similar to Stake's curve
+            # This creates a curve that starts flat and increases exponentially
+            base = 1.1 + (current_multiplier / 50)  # Adjust base for different curve steepness
+            y = np.power(base, x) - 1
+            
+            # Normalize to match current multiplier
+            y = y * (current_multiplier / y[-1]) if y[-1] > 0 else y
+            
+            # Adjust x-axis for better time representation (similar to Stake)
+            # This stretches the x-axis slightly to match the actual time feel
+            x = np.linspace(0, current_multiplier * 1.05, len(y))
+            
+            # Setup figure
             fig.set_facecolor(bg_color)
             ax = plt.gca()
             ax.set_facecolor(bg_color)
 
-            # Create a custom gradient that changes based on multiplier and state
+            # Create grid with subtle lines for a more professional look
+            plt.grid(True, linestyle='-', alpha=0.05, color='#FFFFFF')
+            
+            # Add horizontal lines at significant multiplier values (like Stake)
+            significant_multipliers = [1.5, 2, 3, 5, 10, 20, 50, 100]
+            for mult in significant_multipliers:
+                if mult <= current_multiplier * 1.2:
+                    plt.axhline(y=mult, color='#FFFFFF', alpha=0.08, linewidth=1)
+                    # Add multiplier labels on y-axis
+                    plt.text(-0.02 * current_multiplier, mult, f"{mult}x", 
+                             color='#FFFFFF', alpha=0.5, fontsize=8, ha='right', va='center')
+            
+            # Define colors based on state - using Stake's color scheme
             if crashed:
-                gradient_colors = plt.cm.hot(np.linspace(0, 1, 100))
-                gradient_alpha = 0.15
+                # Red theme for crash
+                main_color = '#FF4747'  # Stake's crash red
+                glow_color = '#FF2424'
+                accent_color = '#FF0000'
             elif cash_out:
-                gradient_colors = plt.cm.viridis(np.linspace(0, 1, 100))
-                gradient_alpha = 0.15
+                # Green theme for cash out
+                main_color = '#00C853'  # Stake's success green
+                glow_color = '#00E676'
+                accent_color = '#00FF00'
             else:
-                if current_multiplier < 2:
-                    gradient_colors = plt.cm.viridis(np.linspace(0, 1, 100))
-                elif current_multiplier < 5:
-                    gradient_colors = plt.cm.plasma(np.linspace(0, 1, 100))
-                else:
-                    gradient_colors = plt.cm.inferno(np.linspace(0, 1, 100))
-                gradient_alpha = 0.12 + min(0.03, current_multiplier * 0.005)  # Increases with multiplier
-
-            # Apply gradient background
-            gradient = np.linspace(0, 1, 100).reshape(-1, 1)
-            plt.imshow(gradient, extent=[0, max(2, current_multiplier * 1.1), 0, max(2, current_multiplier * 1.1)], 
-                      aspect='auto', cmap='viridis', alpha=gradient_alpha)
-
-            # Add subtle glowing effect
-            for i, alpha in zip(range(3), [0.05, 0.03, 0.01]):
-                plt.plot(x, y, color='white', linewidth=6+i*2, alpha=alpha, zorder=1)
-
-            # Determine line color and style based on game state
-            if crashed:
-                line_color = '#FF5555'  # Bright red for crash
-                line_style = '-'
-                line_width = 4
-                glow_color = '#FF0000'
-            elif cash_out:
-                line_color = '#55FF55'  # Bright green for cashout
-                line_style = '-'
-                line_width = 4
-                glow_color = '#00FF00'
-            else:
-                # Create a gradient line color based on multiplier
+                # Blue theme for active game - changes based on multiplier
                 if current_multiplier < 1.5:
-                    line_color = '#00FFAE'  # Teal/cyan color
-                    glow_color = '#00FFAE'
-                elif current_multiplier < 3:
-                    line_color = '#FFDD00'  # Yellow
-                    glow_color = '#FFDD00'
-                elif current_multiplier < 7:
-                    line_color = '#FF8800'  # Orange
-                    glow_color = '#FF8800'
+                    main_color = '#00A3FF'  # Light blue
+                    glow_color = '#00B8FF'
+                elif current_multiplier < 2.5:
+                    main_color = '#18BFFF'  # Cyan-blue
+                    glow_color = '#00CCFF'
+                elif current_multiplier < 5:
+                    main_color = '#FFB800'  # Yellow-orange
+                    glow_color = '#FFC107'
                 else:
-                    line_color = '#FF4400'  # Deep orange/red
-                    glow_color = '#FF4400'
-                line_style = '-'
-                line_width = 3.5
-
-            # Add subtle line glow effect
-            for i, alpha in zip(range(3), [0.2, 0.1, 0.05]):
-                plt.plot(x, y, color=glow_color, linewidth=line_width+i, alpha=alpha, zorder=3)
-
-            # Plot the main line
-            plt.plot(x, y, color=line_color, linewidth=line_width, linestyle=line_style, zorder=4)
-
-            # Add points along the curve for visual effect
-            if not crashed and not cash_out and current_multiplier > 1.2:
-                # More points for higher multipliers
-                n_points = min(int(current_multiplier * 4), 40)
-                point_indices = np.linspace(0, len(x)-1, n_points, dtype=int)
-
-                # Add glow to points
-                for i, alpha in zip(range(3), [0.1, 0.05, 0.02]):
-                    plt.scatter(x[point_indices], y[point_indices], color='white', s=20+i*10, alpha=alpha, zorder=4)
-
-                # Main points with pulsating sizes based on index
-                sizes = 15 + 10 * np.sin(np.linspace(0, 2*np.pi, len(point_indices)))
-                plt.scatter(x[point_indices], y[point_indices], color='white', s=sizes, alpha=0.7, zorder=5)
-
-            # Add special markers and text for crash or cash out points
-            if crashed:
-                # Create explosion effect for crash
-                for i, alpha in zip(range(5), [0.05, 0.1, 0.15, 0.2, 0.3]):
-                    plt.scatter([current_multiplier], [current_multiplier], color='darkred', 
-                               s=400-i*50, marker='*', alpha=alpha, zorder=5+i)
-
-                # Main explosion
-                plt.scatter([current_multiplier], [current_multiplier], color='red', s=150, marker='*', zorder=10)
-
-                # Add "boom" lines radiating from crash point
-                n_lines = 12
-                for i in range(n_lines):
-                    angle = 2 * np.pi * i / n_lines
-                    length = 0.3 + 0.1 * np.random.random()
-                    dx, dy = length * np.cos(angle), length * np.sin(angle)
-                    plt.plot([current_multiplier, current_multiplier+dx], 
-                            [current_multiplier, current_multiplier+dy],
-                            color='red', alpha=0.6, linewidth=1.5, zorder=9)
-
-                # Add crash text without shadow effect
-                plt.text(current_multiplier, current_multiplier + 0.3, f"CRASHED AT {current_multiplier:.2f}x", 
-                         color='white', fontweight='bold', fontsize=14, ha='right', va='bottom',
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor='red', alpha=0.8, edgecolor='darkred'))
-
-            elif cash_out:
-                # Add diamond symbol for cash out with glowing effect
-                for i, alpha in zip(range(5), [0.05, 0.1, 0.15, 0.2, 0.3]):
-                    plt.scatter([current_multiplier], [current_multiplier], color='darkgreen', 
-                               s=300-i*30, marker='D', alpha=alpha, zorder=5+i)
-
-                # Main diamond
-                plt.scatter([current_multiplier], [current_multiplier], color='lime', s=130, marker='D', zorder=10)
-
-                # Add shine effect on diamond
-                plt.plot([current_multiplier-0.1, current_multiplier+0.1], 
-                        [current_multiplier+0.1, current_multiplier-0.1],
-                        color='white', alpha=0.8, linewidth=1.5, zorder=11)
-
-                # Add cash out text without shadow effect
-                plt.text(current_multiplier, current_multiplier + 0.3, f"CASHED OUT AT {current_multiplier:.2f}x", 
-                         color='white', fontweight='bold', fontsize=14, ha='right', va='bottom',
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor='green', alpha=0.8, edgecolor='darkgreen'))
-
-            # Add current multiplier display
-            # Create a more prominent display in top-right corner
+                    main_color = '#FF9800'  # Orange
+                    glow_color = '#FFAB00'
+                accent_color = main_color
+            
+            # Draw line glow effect - subtle for a professional look
+            for width, alpha in [(4, 0.1), (3, 0.15), (2, 0.2)]:
+                plt.plot(x, y, color=glow_color, linewidth=width, alpha=alpha, zorder=2)
+            
+            # Main line with solid color
+            plt.plot(x, y, color=main_color, linewidth=2, linestyle='-', zorder=3)
+            
+            # Add small dots along the curve like Stake's graph
             if not crashed and not cash_out:
-                # Add glowing effect around the multiplier text
-                for i, alpha in zip(range(3), [0.1, 0.07, 0.04]):
-                    plt.text(0.95, 0.95, f"{current_multiplier:.2f}x", 
-                             transform=plt.gca().transAxes, color='white', fontsize=22+i, fontweight='bold', 
-                             ha='right', va='top', alpha=alpha)
-
-                # Main multiplier text
-                plt.text(0.95, 0.95, f"{current_multiplier:.2f}x", 
-                         transform=plt.gca().transAxes, color='white', fontsize=22, fontweight='bold', 
-                         ha='right', va='top',
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor=line_color, alpha=0.8, edgecolor='white', linewidth=1))
-
-            # Set axes properties with improved grid
-            plt.grid(True, linestyle='--', alpha=0.15, color='white')
-
-            # Add grid highlights at important multiplier levels
-            highlight_multipliers = [2, 5, 10, 15]
-            for m in highlight_multipliers:
-                if m <= current_multiplier * 1.1:
-                    plt.axhline(y=m, color='white', alpha=0.2, linestyle='-', linewidth=0.8)
-                    plt.text(0.05, m, f"{m}x", color='white', alpha=0.5, fontsize=8, va='bottom')
-
-            # Set limits with more headroom for visual effect
-            plt.xlim(0, max(2, current_multiplier * 1.15))
-            plt.ylim(0, max(2, current_multiplier * 1.15))
-
-            # Remove axis numbers, keep only the graph
+                # Less points for cleaner look - Stake's graph is clean
+                n_points = min(int(current_multiplier * 3), 25)
+                point_indices = np.linspace(0, len(x)-20, n_points, dtype=int)
+                
+                # Small subtle dots
+                plt.scatter(x[point_indices], y[point_indices], color=main_color, 
+                           s=20, alpha=0.7, zorder=4, edgecolor='white', linewidth=0.5)
+            
+            # Add crash or cash out indicators - clean and professional
+            if crashed:
+                # Simple clean crash indicator
+                plt.scatter([x[-1]], [y[-1]], color=main_color, s=100, marker='x', 
+                           linewidth=2, zorder=10)
+                
+                # Text indicator with clean box
+                plt.text(x[-1] - 0.05 * current_multiplier, y[-1] + 0.1 * current_multiplier, 
+                        f"CRASH @ {current_multiplier:.2f}x", 
+                        color='white', fontweight='bold', fontsize=12, ha='right', va='bottom',
+                        bbox=dict(boxstyle="round,pad=0.4", facecolor=main_color, alpha=0.9, 
+                                 edgecolor='none'))
+                
+            elif cash_out:
+                # Diamond for cash out - cleaner than previous version
+                plt.scatter([x[-1]], [y[-1]], color=main_color, s=100, marker='D', 
+                           zorder=10, edgecolor='white', linewidth=0.5)
+                
+                # Cash out indicator with clean styling
+                plt.text(x[-1] - 0.05 * current_multiplier, y[-1] + 0.1 * current_multiplier, 
+                        f"CASHED OUT @ {current_multiplier:.2f}x", 
+                        color='white', fontweight='bold', fontsize=12, ha='right', va='bottom',
+                        bbox=dict(boxstyle="round,pad=0.4", facecolor=main_color, alpha=0.9, 
+                                 edgecolor='none'))
+            
+            # Add the multiplier in a clean box at top-right - Stake style
+            if not crashed and not cash_out:
+                # Draw clean box with multiplier in top right
+                plt.text(0.97, 0.95, f"{current_multiplier:.2f}x", 
+                        transform=plt.gca().transAxes, color='white', fontsize=18, fontweight='bold', 
+                        ha='right', va='top',
+                        bbox=dict(boxstyle="round,pad=0.4", facecolor=main_color, alpha=0.9, 
+                                 edgecolor='none'))
+            
+            # Clean up axes
+            plt.xlim(0, max(1.5, current_multiplier * 1.1))
+            plt.ylim(0, max(1.5, current_multiplier * 1.1))
+            
+            # Remove tick labels for a cleaner look
             plt.xticks([])
             plt.yticks([])
-
-            # Remove spines (borders)
+            
+            # Remove border lines
             for spine in plt.gca().spines.values():
                 spine.set_visible(False)
-
-            # Add subtle BetSync watermark/branding
-            # Add BetSync watermark
+                
+            # Add subtle grid lines along x-axis (time)
+            for i in range(1, int(current_multiplier) + 1):
+                if i <= current_multiplier:
+                    plt.axvline(x=i, color='#FFFFFF', alpha=0.05, linewidth=1)
+            
+            # Add subtle branding in bottom like Stake
             plt.text(0.5, 0.03, "BetSync Casino", transform=plt.gca().transAxes,
-                    color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center')
-
-            # Save plot to bytes buffer with higher quality
+                    color='white', alpha=0.3, fontsize=12, fontweight='normal', ha='center')
+            
+            # Add subtle graph overlay to make it look more professional
+            if not crashed and not cash_out:
+                # Draw subtle gradient overlay
+                gradient = np.linspace(0, 1, 100).reshape(-1, 1)
+                plt.imshow(gradient, extent=[0, max(1.5, current_multiplier * 1.1), 
+                                           0, max(1.5, current_multiplier * 1.1)],
+                          aspect='auto', cmap='Blues', alpha=0.05)
+            
+            # Save plot with high quality
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=120, bbox_inches='tight', transparent=False)
+            plt.savefig(buf, format='png', dpi=120, bbox_inches='tight', facecolor=bg_color)
             buf.seek(0)
-
+            
             # Create discord File object
             file = discord.File(buf, filename="crash_graph.png")
-
+            
             # Create embed with the graph
             embed = discord.Embed(color=0x2B2D31)
             embed.set_image(url="attachment://crash_graph.png")
-
+            
             return embed, file
         except Exception as e:
             # Error handling for graph generation
