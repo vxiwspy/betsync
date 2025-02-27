@@ -632,9 +632,9 @@ class Games(commands.Cog):
     def generate_crash_graph(self, current_multiplier, crashed=False, cash_out=False):
         """Generate a crash game graph with improved visuals"""
         try:
-            # Clear previous plot and create new figure
-            plt.clf()
-            plt.figure(figsize=(10, 6), dpi=100)
+            # Clear and close previous plots to prevent memory issues
+            plt.close('all')
+            fig = plt.figure(figsize=(10, 6), dpi=100)
             
             # Set background color with a darker theme
             bg_color = '#1E1F22'
@@ -655,8 +655,8 @@ class Games(commands.Cog):
             # Scale y values to match the current multiplier
             y = y * (current_multiplier / y[-1])
             
-            # Add subtle gradient background with more dynamic colors
-            plt.figure(figsize=(10, 6), dpi=100, facecolor=bg_color)
+            # Use the existing figure and set its properties
+            fig.set_facecolor(bg_color)
             ax = plt.gca()
             ax.set_facecolor(bg_color)
             
@@ -718,9 +718,7 @@ class Games(commands.Cog):
                 plt.plot(x, y, color=glow_color, linewidth=line_width+i, alpha=alpha, zorder=3)
             
             # Plot the main line
-            plt.plot(x, y, color=line_color, linewidth=line_width, linestyle=line_style, zorder=4, path_effects=[
-                plt.matplotlib.patheffects.withStroke(linewidth=5, foreground='black', alpha=0.3)
-            ])
+            plt.plot(x, y, color=line_color, linewidth=line_width, linestyle=line_style, zorder=4)
             
             # Add points along the curve for visual effect
             if not crashed and not cash_out and current_multiplier > 1.2:
@@ -756,11 +754,10 @@ class Games(commands.Cog):
                             [current_multiplier, current_multiplier+dy],
                             color='red', alpha=0.6, linewidth=1.5, zorder=9)
                 
-                # Add crash text with shadow effect
+                # Add crash text without shadow effect
                 plt.text(current_multiplier, current_multiplier + 0.3, f"CRASHED AT {current_multiplier:.2f}x", 
                          color='white', fontweight='bold', fontsize=14, ha='right', va='bottom',
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor='red', alpha=0.8, edgecolor='darkred'),
-                         path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=3, foreground='black', alpha=0.3)])
+                         bbox=dict(boxstyle="round,pad=0.3", facecolor='red', alpha=0.8, edgecolor='darkred'))
             
             elif cash_out:
                 # Add diamond symbol for cash out with glowing effect
@@ -776,11 +773,10 @@ class Games(commands.Cog):
                         [current_multiplier+0.1, current_multiplier-0.1],
                         color='white', alpha=0.8, linewidth=1.5, zorder=11)
                 
-                # Add cash out text with shadow effect
+                # Add cash out text without shadow effect
                 plt.text(current_multiplier, current_multiplier + 0.3, f"CASHED OUT AT {current_multiplier:.2f}x", 
                          color='white', fontweight='bold', fontsize=14, ha='right', va='bottom',
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor='green', alpha=0.8, edgecolor='darkgreen'),
-                         path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=3, foreground='black', alpha=0.3)])
+                         bbox=dict(boxstyle="round,pad=0.3", facecolor='green', alpha=0.8, edgecolor='darkgreen'))
             
             # Add current multiplier display
             # Create a more prominent display in top-right corner
@@ -789,15 +785,13 @@ class Games(commands.Cog):
                 for i, alpha in zip(range(3), [0.1, 0.07, 0.04]):
                     plt.text(0.95, 0.95, f"{current_multiplier:.2f}x", 
                              transform=plt.gca().transAxes, color='white', fontsize=22+i, fontweight='bold', 
-                             ha='right', va='top', alpha=alpha,
-                             path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=3, foreground='black', alpha=0.3)])
+                             ha='right', va='top', alpha=alpha)
                 
                 # Main multiplier text
                 plt.text(0.95, 0.95, f"{current_multiplier:.2f}x", 
                          transform=plt.gca().transAxes, color='white', fontsize=22, fontweight='bold', 
                          ha='right', va='top',
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor=line_color, alpha=0.8, edgecolor='white', linewidth=1),
-                         path_effects=[plt.matplotlib.patheffects.withStroke(linewidth=2, foreground='black', alpha=0.3)])
+                         bbox=dict(boxstyle="round,pad=0.3", facecolor=line_color, alpha=0.8, edgecolor='white', linewidth=1))
             
             # Set axes properties with improved grid
             plt.grid(True, linestyle='--', alpha=0.15, color='white')
@@ -822,16 +816,9 @@ class Games(commands.Cog):
                 spine.set_visible(False)
             
             # Add subtle BetSync watermark/branding
-            # Add BetSync watermark with fallback for missing patheffects
-            try:
-                import matplotlib.patheffects as path_effects
-                plt.text(0.5, 0.03, "BetSync Casino", transform=plt.gca().transAxes,
-                        color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center',
-                        path_effects=[path_effects.withStroke(linewidth=2, foreground='black', alpha=0.2)])
-            except (ImportError, AttributeError):
-                # Fallback if patheffects is not available
-                plt.text(0.5, 0.03, "BetSync Casino", transform=plt.gca().transAxes,
-                        color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center')
+            # Add BetSync watermark without patheffects
+            plt.text(0.5, 0.03, "BetSync Casino", transform=plt.gca().transAxes,
+                    color='white', alpha=0.3, fontsize=14, fontweight='bold', ha='center')
             
             # Save plot to bytes buffer with higher quality
             buf = io.BytesIO()
