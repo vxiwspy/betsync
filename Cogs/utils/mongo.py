@@ -43,3 +43,29 @@ class Users:
             return True
         except Exception as e:
             return False
+
+class Servers:
+    _instance = None
+    _client = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(Servers, cls).__new__(cls)
+            cls._client = MongoClient(os.environ["MONGO"])
+            return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, 'db'):
+            self.db = self._client["BetSync"]
+            self.collection = self.db["servers"]
+
+    def get_total_all_servers(self):
+        return self.collection.count_documents({})
+
+    def new_server(self, dump):
+        server_id = dump["server_id"]
+        if self.collection.count_documents({"server_id": server_id}):
+            return False
+        else:
+            new_server_ = self.collection.insert_one({dump}) 
+            return self.collection.find_one({"server_id": server_id})

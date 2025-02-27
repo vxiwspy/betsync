@@ -3,19 +3,37 @@ import discord
 from colorama import Fore
 from discord.ext import commands
 from pymongo import ReturnDocument
-from Cogs.utils.mongo import Users
+from Cogs.utils.mongo import Users, Servers
 from Cogs.utils.emojis import emoji
 
+#globals
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all(), case_insensitive=True)
 bot.remove_command("help")
 
-cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start", "Cogs.currency", "Cogs.history", "Cogs.tip", "Cogs.games", "Cogs.admin"]
+cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start", "Cogs.currency", "Cogs.history", "Cogs.tip", "Cogs.games.crash", "Cogs.admin"]
 
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         print(f"{Fore.RED}[-] {Fore.WHITE} Some monkey {Fore.BLACK}{ctx.message.author}{Fore.WHITE} tried to use a non existsent command 💔💔💔")
+
+@bot.event
+async def on_guild_join(guild):
+    db = Servers()
+    dump = {
+        "server_id": guild.id,
+        "server_name": guild.name,
+        "total_profit": 0,
+        "giveaway_channel": None,
+        "server_admins": []
+    }
+    resp = db.new_server(dump)
+    if not resp:
+        return
+    else:
+        print(f"{Fore.GREEN}[+] {Fore.WHITE}New Server Registered: {Fore.GREEN}{resp}{Fore.WHITE}")
+        return
 
 @bot.event
 async def on_command(ctx):

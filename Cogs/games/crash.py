@@ -96,7 +96,7 @@ class PlayAgainView(discord.ui.View):
             await interaction.followup.send("Starting a new game with the same bet...", ephemeral=True)
             await self.cog.crash(self.ctx, str(self.bet_amount))
 
-class Games(commands.Cog):
+class CrashCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.ongoing_games = {}
@@ -982,4 +982,4 @@ class Games(commands.Cog):
                 return embed, None
 
 def setup(bot):
-    bot.add_cog(Games(bot))
+    bot.add_cog(CrashCog(bot))

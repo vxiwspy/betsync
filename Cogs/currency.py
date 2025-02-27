@@ -303,6 +303,7 @@ class Deposit(commands.Cog):
 
         # Validate input
         if not currency or not amount:
+            await loading_message.delete()
             usage_embed = discord.Embed(
                 title=":bulb: How to Use `!dep`",
                 description="**Usage:** `!dep <currency> <amount in USD>`\n**Example:** `!dep BTC 50`",
@@ -312,7 +313,8 @@ class Deposit(commands.Cog):
                 name=":pushpin: Supported Currencies",
                 value="BTC, LTC, SOL, ETH, USDT (ERC20)"
             )
-            return await ctx.reply(embed=usage_embed)
+            await ctx.reply(embed=usage_embed)
+            return await self.dep.reset_cooldown(ctx)
 
         currency = currency.upper()
         if currency not in self.supported_currencies:
