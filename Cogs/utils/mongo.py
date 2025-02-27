@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 import os
 
-mongodb = MongoClient(os.environ["MONGO_URI"])
+mongodb = MongoClient(os.environ["MONGO"])
 
 
 class Users:
