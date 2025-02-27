@@ -534,8 +534,8 @@ class CrashCog(commands.Cog):
 
                     # Add to history
                     from Cogs.utils.mongo import Servers
-                    db = Servers()
-                    db.update_server_profit(ctx.guild.id, bet_amount)
+                    dbb = Servers()
+                    dbb.update_server_profit(ctx.guild.id, bet_amount)
                     history_entry = {
                         "type": "loss",
                         "game": "crash",
@@ -548,6 +548,11 @@ class CrashCog(commands.Cog):
                         {"discord_id": ctx.author.id},
                         {"$push": {"history": {"$each": [history_entry], "$slice": -100}}}
                     )
+                    #from Cogs.utils.mongo import Servers
+                    #dbb = Servers()
+                    history_entry["user_id"] = ctx.author.id
+                    history_entry["user_name"] = ctx.author.name
+                    dbb.update_history(ctx.guild.id, history_entry)
 
                     # Update stats
                     db.collection.update_one(
@@ -651,7 +656,13 @@ class CrashCog(commands.Cog):
                         {"discord_id": ctx.author.id},
                         {"$push": {"history": {"$each": [history_entry], "$slice": -100}}}
                     )
-
+                    
+                    from Cogs.utils.mongo import Servers
+                    dbb = Servers()
+                    history_entry["user_id"] = ctx.author.id
+                    history_entry["user_name"] = ctx.author.name
+                    dbb.update_history(ctx.guild.id, history_entry)
+                    
                     # Update stats
                     db.collection.update_one(
                         {"discord_id": ctx.author.id},

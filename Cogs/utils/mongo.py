@@ -71,16 +71,6 @@ class Servers:
             return self.collection.find_one({"server_id": server_id})
             
     def update_server_profit(self, server_id, profit_amount):
-        """
-        Updates the total profit value for a server.
-        
-        Args:
-            server_id: The ID of the server to update
-            profit_amount: The amount to add to the total profit (negative for player wins)
-        
-        Returns:
-            bool: True if the update was successful, False otherwise
-        """
         try:
             self.collection.update_one(
                 {"server_id": server_id},
@@ -100,3 +90,11 @@ class Servers:
                 return True
             else:
                 return False
+
+    def fetch_server(self, server_id):
+        if self.collection.count_documents({"server_id": server_id}):
+            return self.collection.find_one({"server_id": server_id})
+
+        else:
+            return False
+            
