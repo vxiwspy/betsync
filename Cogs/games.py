@@ -11,9 +11,8 @@ from discord.ext import commands
 from Cogs.utils.mongo import Users
 from Cogs.utils.emojis import emoji
 
-class CrashView(discord.ui.View):
+class CrashGame:
     def __init__(self, cog, ctx, bet_amount, user_id):
-        super().__init__(timeout=None)
         self.cog = cog
         self.ctx = ctx
         self.bet_amount = bet_amount
@@ -24,29 +23,7 @@ class CrashView(discord.ui.View):
         self.cash_out_multiplier = 0.0
         self.tokens_used = 0
         self.credits_used = 0
-
-    @discord.ui.button(label="Cash Out", style=discord.ButtonStyle.green, emoji="💰")
-    async def cash_out(self, button, interaction: discord.Interaction):
-        if interaction.user.id != self.user_id:
-            return await interaction.response.send_message("This is not your game!", ephemeral=True)
-            
-        if self.crashed:
-            return await interaction.response.send_message("Game already crashed!", ephemeral=True)
-            
-        self.cashed_out = True
-        self.cash_out_multiplier = self.current_multiplier
-        button.disabled = True
-        button.label = f"Cashed Out at {self.cash_out_multiplier:.2f}x"
-        await interaction.response.edit_message(view=self)
-        
-        # Send immediate feedback to player
-        winnings = int(self.bet_amount * self.cash_out_multiplier)
-        feedback_embed = discord.Embed(
-            title="✅ Cash Out Successful!",
-            description=f"You cashed out at **{self.cash_out_multiplier:.2f}x**\nWinnings: **{winnings} credits**",
-            color=0x00FF00
-        )
-        await interaction.followup.send(embed=feedback_embed, ephemeral=True)
+        self.message = None
 
 class PlayAgainView(discord.ui.View):
     def __init__(self, cog, ctx, bet_amount, timeout=60):
@@ -122,6 +99,21 @@ class Games(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.ongoing_games = {}
+        
+    @commands.Cog.listener()
+    async def on_reaction_add(self, reaction, user):
+        # Check if this is a cash out reaction for a crash game
+        if str(reaction.emoji) == "💰" and user.id in self.ongoing_games:
+            game_data = self.ongoing_games.get(user.id)
+            if game_data and "crash_game" in game_data:
+                crash_game = game_data["crash_game"]
+                # Only process if it's the game owner and the game is still active
+                if (user.id == crash_game.user_id and 
+                    reaction.message.id == crash_game.message.id and
+                    not crash_game.crashed and not crash_game.cashed_out):
+                    # Set cash out values
+                    crash_game.cashed_out = True
+                    crash_game.cash_out_multiplier = crash_game.current_multiplier
 
     @commands.command(aliases=["cr"])
     async def crash(self, ctx, bet_amount: str = None, currency_type: str = None):
@@ -134,7 +126,7 @@ class Games(commands.Cog):
                     "**Usage:** `!crash <amount> [currency_type]`\n"
                     "**Example:** `!crash 100` or `!crash 100 tokens`\n\n"
                     "- Watch as the multiplier increases in real-time\n"
-                    "- Click **Cash Out** before it crashes to win\n"
+                    "- React with 💰 before it crashes to cash out and win\n"
                     "- If it crashes before you cash out, you lose your bet\n"
                     "- The longer you wait, the higher the potential reward!\n\n"
                     "You can bet using tokens (T) or credits (C):\n"
@@ -301,8 +293,8 @@ class Games(commands.Cog):
             {"$inc": {"total_played": 1, "total_spent": total_bet}}
         )
         
-        # Create view with Cash Out button
-        view = CrashView(self, ctx, total_bet, ctx.author.id)
+        # Create CrashGame object instead of a view
+        crash_game = CrashGame(self, ctx, total_bet, ctx.author.id)
         
         # Generate crash point - typically follows a Pareto distribution
         # This gives rare but very high crash points, with most being lower values
@@ -333,7 +325,7 @@ class Games(commands.Cog):
             initial_embed.description = (
                 f"{bet_description}\n"
                 f"**Current Multiplier:** 1.00x\n\n"
-                "Click **Cash Out** before it crashes to win!"
+                "React with 💰 to cash out before it crashes!"
             )
         except Exception as e:
             print(f"Error generating crash graph: {e}")
@@ -354,35 +346,41 @@ class Games(commands.Cog):
         
         # Send message with file attachment if available
         if initial_file:
-            message = await ctx.reply(embed=initial_embed, file=initial_file, view=view)
+            message = await ctx.reply(embed=initial_embed, file=initial_file)
         else:
-            message = await ctx.reply(embed=initial_embed, view=view)
+            message = await ctx.reply(embed=initial_embed)
+            
+        # Add cash out reaction
+        await message.add_reaction("💰")
+            
+        # Store message in the crash game object
+        crash_game.message = message
         
         # Mark the game as ongoing
         self.ongoing_games[ctx.author.id] = {
             "message": message,
-            "view": view,
+            "crash_game": crash_game,
             "tokens_used": tokens_used,
             "credits_used": credits_used
         }
         
         # Track the currency used for winning calculation
-        view.tokens_used = tokens_used
-        view.credits_used = credits_used
+        crash_game.tokens_used = tokens_used
+        crash_game.credits_used = credits_used
         
         # Start the game
-        await self.run_crash_game(ctx, message, view, crash_point, total_bet)
+        await self.run_crash_game(ctx, message, crash_game, crash_point, total_bet)
         
-    async def run_crash_game(self, ctx, message, view, crash_point, bet_amount):
+    async def run_crash_game(self, ctx, message, crash_game, crash_point, bet_amount):
         """Run the crash game animation and handle the result"""
         try:
             multiplier = 1.0
             growth_rate = 0.05  # Controls how fast the multiplier increases
             
             # Format bet amount description based on tokens and credits used
-            if hasattr(view, 'tokens_used') and hasattr(view, 'credits_used'):
-                tokens_used = view.tokens_used
-                credits_used = view.credits_used
+            if hasattr(crash_game, 'tokens_used') and hasattr(crash_game, 'credits_used'):
+                tokens_used = crash_game.tokens_used
+                credits_used = crash_game.credits_used
                 
                 if tokens_used > 0 and credits_used > 0:
                     bet_description = f"**Bet Amount:** {tokens_used} tokens + {credits_used} credits"
@@ -393,16 +391,61 @@ class Games(commands.Cog):
             else:
                 bet_description = f"**Bet Amount:** {bet_amount}"
             
+            # Create an event to track reaction cash out
+            cash_out_event = asyncio.Event()
+            
+            # Set up reaction check
+            def reaction_check(reaction, user):
+                # Only check reactions from the game owner on the game message with 💰 emoji
+                return (user.id == ctx.author.id and 
+                        reaction.message.id == message.id and 
+                        str(reaction.emoji) == "💰" and
+                        not crash_game.crashed)
+            
+            # Start reaction listener task
+            async def reaction_listener():
+                try:
+                    # Wait for the cash out reaction
+                    reaction, user = await self.bot.wait_for('reaction_add', check=reaction_check)
+                    if not crash_game.crashed and not crash_game.cashed_out:
+                        # Set cash out values
+                        crash_game.cashed_out = True
+                        crash_game.cash_out_multiplier = crash_game.current_multiplier
+                        # Set the event to notify the main loop
+                        cash_out_event.set()
+                        
+                        # Send immediate feedback to player
+                        winnings = int(bet_amount * crash_game.cash_out_multiplier)
+                        feedback_embed = discord.Embed(
+                            title="✅ Cash Out Successful!",
+                            description=f"You cashed out at **{crash_game.cash_out_multiplier:.2f}x**\nWinnings: **{winnings} credits**",
+                            color=0x00FF00
+                        )
+                        await ctx.send(embed=feedback_embed, delete_after=5)
+                except Exception as e:
+                    print(f"Error in reaction listener: {e}")
+            
+            # Start the reaction listener in the background
+            reaction_task = asyncio.create_task(reaction_listener())
+            
             # Continue incrementing the multiplier until crash or cash out
-            while multiplier < crash_point and not view.cashed_out:
+            while multiplier < crash_point and not crash_game.cashed_out:
                 # Wait a bit between updates (faster at the start, slower as multiplier increases)
                 delay = 1.0 / (1 + multiplier * 0.5)
                 delay = max(0.3, min(delay, 0.8))  # Keep delay between 0.3 and 0.8 seconds
-                await asyncio.sleep(delay)
+                
+                # Wait for either the delay to pass or cash out event to be triggered
+                try:
+                    await asyncio.wait_for(cash_out_event.wait(), timeout=delay)
+                    # If we get here, the cash out event was triggered
+                    break
+                except asyncio.TimeoutError:
+                    # Timeout means the delay passed normally, continue with game
+                    pass
                 
                 # Increase multiplier with a bit of randomness
                 multiplier += growth_rate * (1 + random.uniform(-0.2, 0.2))
-                view.current_multiplier = multiplier
+                crash_game.current_multiplier = multiplier
                 
                 try:
                     # Generate updated graph and embed
@@ -411,11 +454,11 @@ class Games(commands.Cog):
                     embed.description = (
                         f"{bet_description}\n"
                         f"**Current Multiplier:** {multiplier:.2f}x\n\n"
-                        "Click **Cash Out** before it crashes to win!"
+                        "React with 💰 to cash out before it crashes!"
                     )
                     
-                    # Update the message with new graph - use files parameter instead of attachments
-                    await message.edit(embed=embed, files=[file], view=view)
+                    # Update the message with new graph
+                    await message.edit(embed=embed, attachments=[file])
                 except Exception as graph_error:
                     print(f"Error updating graph: {graph_error}")
                     # Simple fallback in case graph generation fails
@@ -425,26 +468,32 @@ class Games(commands.Cog):
                             description=(
                                 f"{bet_description}\n"
                                 f"**Current Multiplier:** {multiplier:.2f}x\n\n"
-                                "Click **Cash Out** before it crashes to win!"
+                                "React with 💰 to cash out before it crashes!"
                             ),
                             color=0x00FFAE
                         )
-                        await message.edit(embed=embed, view=view)
+                        await message.edit(embed=embed)
                     except Exception as fallback_error:
                         print(f"Error updating fallback message: {fallback_error}")
+            
+            # Cancel the reaction task if it's still running
+            if not reaction_task.done():
+                reaction_task.cancel()
                 
             # Game ended - either crashed or cashed out
-            view.crashed = True
+            crash_game.crashed = True
             
-            # Disable the cash out button
-            for item in view.children:
-                item.disabled = True
+            # Try to clear reactions
+            try:
+                await message.clear_reactions()
+            except:
+                pass
             
             # Get database connection
             db = Users()
                 
             # Handle crash
-            if not view.cashed_out:
+            if not crash_game.cashed_out:
                 try:
                     # Generate crash graph
                     embed, file = self.generate_crash_graph(multiplier, True)
@@ -476,10 +525,8 @@ class Games(commands.Cog):
                         {"$inc": {"total_lost": 1}}
                     )
                     
-                    # Create Play Again view
-                    play_again_view = PlayAgainView(self, ctx, bet_amount)
-                    
-                    # Add Play Again button to the same view
+                    # Create Play Again view with button
+                    play_again_view = discord.ui.View()
                     play_again_button = discord.ui.Button(
                         label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄"
                     )
@@ -493,10 +540,10 @@ class Games(commands.Cog):
                         await self.crash(ctx, str(bet_amount))
                     
                     play_again_button.callback = play_again_callback
-                    view.add_item(play_again_button)
+                    play_again_view.add_item(play_again_button)
                     
                     # Update message with crash result and Play Again button
-                    await message.edit(embed=embed, files=[file], view=view)
+                    await message.edit(embed=embed, attachments=[file], view=play_again_view)
                     
                 except Exception as crash_error:
                     print(f"Error handling crash: {crash_error}")
@@ -511,7 +558,8 @@ class Games(commands.Cog):
                             ),
                             color=0xFF0000
                         )
-                        # Add Play Again button to the view
+                        # Add Play Again button
+                        play_again_view = discord.ui.View()
                         play_again_button = discord.ui.Button(
                             label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄"
                         )
@@ -525,10 +573,10 @@ class Games(commands.Cog):
                             await self.crash(ctx, str(bet_amount))
                         
                         play_again_button.callback = play_again_callback
-                        view.add_item(play_again_button)
+                        play_again_view.add_item(play_again_button)
                         
-                        # Update message with the view containing Play Again button
-                        await message.edit(embed=embed, view=view)
+                        # Update message with Play Again button
+                        await message.edit(embed=embed, view=play_again_view)
                         
                     except Exception as fallback_error:
                         print(f"Error updating fallback crash message: {fallback_error}")
@@ -536,7 +584,7 @@ class Games(commands.Cog):
             else:
                 try:
                     # User cashed out successfully
-                    cash_out_multiplier = view.cash_out_multiplier
+                    cash_out_multiplier = crash_game.cash_out_multiplier
                     winnings = int(bet_amount * cash_out_multiplier)
                     profit = winnings - bet_amount
                     
@@ -575,7 +623,8 @@ class Games(commands.Cog):
                         {"$inc": {"total_won": 1, "total_earned": winnings}}
                     )
                     
-                    # Create Play Again button
+                    # Create Play Again view with button
+                    play_again_view = discord.ui.View()
                     play_again_button = discord.ui.Button(
                         label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄"
                     )
@@ -589,10 +638,10 @@ class Games(commands.Cog):
                         await self.crash(ctx, str(bet_amount))
                     
                     play_again_button.callback = play_again_callback
-                    view.add_item(play_again_button)
+                    play_again_view.add_item(play_again_button)
                     
                     # Update message with win result and Play Again button
-                    await message.edit(embed=embed, files=[file], view=view)
+                    await message.edit(embed=embed, attachments=[file], view=play_again_view)
                     
                 except Exception as win_error:
                     print(f"Error handling win: {win_error}")
@@ -608,7 +657,8 @@ class Games(commands.Cog):
                             ),
                             color=0x00FF00
                         )
-                        # Add Play Again button to the view
+                        # Add Play Again button
+                        play_again_view = discord.ui.View()
                         play_again_button = discord.ui.Button(
                             label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄"
                         )
@@ -622,13 +672,13 @@ class Games(commands.Cog):
                             await self.crash(ctx, str(bet_amount))
                         
                         play_again_button.callback = play_again_callback
-                        view.add_item(play_again_button)
+                        play_again_view.add_item(play_again_button)
                         
                         # Make sure winnings are credited even if graph fails
                         db.update_balance(ctx.author.id, winnings, "credits", "$inc")
                         
-                        # Update message with view containing Play Again button
-                        await message.edit(embed=embed, view=view)
+                        # Update message with Play Again button
+                        await message.edit(embed=embed, view=play_again_view)
                         
                     except Exception as fallback_error:
                         print(f"Error updating fallback win message: {fallback_error}")
@@ -646,13 +696,13 @@ class Games(commands.Cog):
                 
                 # Refund the bet if there was an error
                 db = Users()
-                if hasattr(view, 'tokens_used') and view.tokens_used > 0:
+                if hasattr(crash_game, 'tokens_used') and crash_game.tokens_used > 0:
                     current_tokens = db.fetch_user(ctx.author.id)['tokens']
-                    db.update_balance(ctx.author.id, current_tokens + view.tokens_used, "tokens")
+                    db.update_balance(ctx.author.id, current_tokens + crash_game.tokens_used, "tokens")
                 
-                if hasattr(view, 'credits_used') and view.credits_used > 0:
+                if hasattr(crash_game, 'credits_used') and crash_game.credits_used > 0:
                     current_credits = db.fetch_user(ctx.author.id)['credits']
-                    db.update_balance(ctx.author.id, current_credits + view.credits_used, "credits")
+                    db.update_balance(ctx.author.id, current_credits + crash_game.credits_used, "credits")
             except Exception as refund_error:
                 print(f"Error refunding bet: {refund_error}")
         finally:
