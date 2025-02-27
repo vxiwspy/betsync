@@ -3,6 +3,9 @@ import requests
 import qrcode
 import io
 import asyncio
+
+import datetime
+
 import time
 from PIL import Image, ImageFont, ImageDraw
 from discord.ext import commands
@@ -528,7 +531,26 @@ class Deposit(commands.Cog):
     def process_deposit(self, user_id, tokens_amount):
         """Updates the user's balance when a deposit is successful."""
         db = Users()
+        # Update balance
         resp = db.update_balance(user_id, tokens_amount, "tokens", "$inc")
+        
+        # Add to history
+        history_entry = {
+            "type": "deposit",
+            "amount": tokens_amount,
+            "timestamp": int(datetime.datetime.now().timestamp())
+        }
+        db.collection.update_one(
+            {"discord_id": user_id},
+            {"$push": {"history": {"$each": [history_entry], "$slice": -100}}}  # Keep last 100 entries
+        )
+        
+        # Update total deposit amount
+        db.collection.update_one(
+            {"discord_id": user_id},
+            {"$inc": {"total_deposit_amount": tokens_amount}}
+        )
+        
         user = self.bot.get_user(user_id)
         if user:
             embed = discord.Embed(

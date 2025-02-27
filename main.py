@@ -10,7 +10,7 @@ from Cogs.utils.emojis import emoji
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all(), case_insensitive=True)
 bot.remove_command("help")
 
-cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start" , "Cogs.currency"]
+cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start", "Cogs.currency", "Cogs.history"]
 
 @bot.event
 async def on_command_error(ctx, error):
