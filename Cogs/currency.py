@@ -239,17 +239,37 @@ class Deposit(commands.Cog):
             "fixed": False
         }
         headers = {"Content-Type": "application/json"}
-        response = requests.post(url, json=payload, headers=headers)
+        
+        print(f"[DEBUG] Sending request to: {url}")
+        print(f"[DEBUG] Payload: {payload}")
+        
         try:
-            data = response.json()
-            print(f"[DEBUG] create_exchange response: {data}")
-            if "address_from" in data:
-                return data
-            else:
-                print(f"[ERROR] Missing 'address_from': {data}")
+            response = requests.post(url, json=payload, headers=headers)
+            print(f"[DEBUG] Status code: {response.status_code}")
+            print(f"[DEBUG] Response headers: {response.headers}")
+            
+            if response.status_code != 200:
+                print(f"[ERROR] API returned status code {response.status_code}: {response.text}")
                 return None
-        except requests.exceptions.JSONDecodeError:
-            print(f"[ERROR] Non-JSON response: {response.text}")
+                
+            try:
+                data = response.json()
+                print(f"[DEBUG] create_exchange response: {data}")
+                
+                if isinstance(data, dict) and "address_from" in data:
+                    print(f"[SUCCESS] Deposit address generated: {data['address_from']}")
+                    return data
+                elif isinstance(data, dict) and "message" in data:
+                    print(f"[ERROR] API error message: {data['message']}")
+                    return None
+                else:
+                    print(f"[ERROR] Missing 'address_from' in response: {data}")
+                    return None
+            except requests.exceptions.JSONDecodeError:
+                print(f"[ERROR] Non-JSON response: {response.text}")
+                return None
+        except Exception as e:
+            print(f"[ERROR] Exception during API request: {str(e)}")
             return None
 
     # Cooldown is now handled directly in the command
