@@ -221,11 +221,12 @@ class Tip(commands.Cog):
         embed.add_field(
             name="Usage Options",
             value=(
-                "**Direct Mention:**\n`!tip 100 token @user`\n\n"
-                "**User ID:**\n`!tip 50 credit 123456789012345678`\n\n"
-                "**Reply to Message:**\n`!tip 75 token` (as a reply)\n\n"
+                "**Direct Mention:**\n`!tip 100 token @user` or `!tip 100 t @user`\n\n"
+                "**User ID:**\n`!tip 50 credit 123456789012345678` or `!tip 50 c 123456789012345678`\n\n"
+                "**Reply to Message:**\n`!tip 75 token` or `!tip 75 t` (as a reply)\n\n"
                 "**Shortcuts:**\n"
-                "`!give` and `!donate` also work as aliases."
+                "`!give` and `!donate` also work as aliases.\n"
+                "`t` and `c` can be used for token and credit."
             ),
             inline=False
         )
