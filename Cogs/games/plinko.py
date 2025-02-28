@@ -710,7 +710,7 @@ class PlinkoCog(commands.Cog):
             # Build detailed ball results
             ball_details = ""
             for i, result in enumerate(ball_results):
-                ball_details += f"Ball #{i+1}: {result['multiplier']:.2f}x → {result['winnings']:.2f} points\n"
+                ball_details += f"Ball #{i+1}: {result['multiplier']:.1f}x → {result['winnings']:.1f} points\n"
             
             # Create embed with results
             result_embed = discord.Embed(
@@ -975,8 +975,8 @@ class PlinkoCog(commands.Cog):
             total_bet = len(ball_results) * (ball_results[0]["winnings"] / ball_results[0]["multiplier"])
             avg_multiplier = total_win / total_bet if total_bet > 0 else 0
             
-            win_text = f"Win: {total_win:.2f}"
-            multiplier_text = f"Multiplier: {avg_multiplier:.2f}x"
+            win_text = f"Win: {total_win:.1f}"
+            multiplier_text = f"Multiplier: {avg_multiplier:.1f}x"
             
             # Position in top right with padding
             padding = 20 * scale_factor
@@ -1057,7 +1057,8 @@ class PlinkoCog(commands.Cog):
             # Draw multiplier text
             x = i * slot_width + slot_width / 2
             y = slot_y + y_offset
-            multiplier_text = f"{multiplier}x"
+            # Format multiplier to 1 decimal place
+            multiplier_text = f"{multiplier:.1f}x"
             
             # If slots are too close, only show every Nth multiplier
             if i % text_skip_factor == 0 or i == landing_position:
