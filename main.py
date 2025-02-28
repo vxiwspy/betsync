@@ -78,7 +78,7 @@ async def on_ready():
         #except Exception as e:
         #print(f"{Fore.RED}[-] {Fore.WHITE}FIX THIS YOU NIGGER {e}")
             
-
+#NIGGER 
 
 
 bot.run(os.environ['TOKEN'])
