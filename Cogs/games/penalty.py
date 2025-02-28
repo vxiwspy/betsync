@@ -1,3 +1,4 @@
+
 import os
 import discord
 import random
@@ -15,7 +16,7 @@ class PlayAgainView(discord.ui.View):
         self.bet_amount = bet_amount
         self.message = None
 
-    @discord.ui.button(label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄")
+    @discord.ui.button(label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄", custom_id="play_again")
     async def play_again(self, button, interaction: discord.Interaction):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
@@ -57,7 +58,7 @@ class PenaltyButtonView(discord.ui.View):
         self.bet_amount = bet_amount
         self.message = None
 
-    @discord.ui.button(label="Left", style=discord.ButtonStyle.primary, emoji="⬅️")
+    @discord.ui.button(label="Left", style=discord.ButtonStyle.primary, emoji="⬅️", custom_id="left")
     async def left_button(self, button, interaction: discord.Interaction):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
@@ -70,7 +71,7 @@ class PenaltyButtonView(discord.ui.View):
         # Process the shot
         await self.cog.process_penalty_shot(self.ctx, interaction, "left", self.bet_amount)
 
-    @discord.ui.button(label="Middle", style=discord.ButtonStyle.primary, emoji="⬆️")
+    @discord.ui.button(label="Middle", style=discord.ButtonStyle.primary, emoji="⬆️", custom_id="middle")
     async def middle_button(self, button, interaction: discord.Interaction):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
@@ -83,7 +84,7 @@ class PenaltyButtonView(discord.ui.View):
         # Process the shot
         await self.cog.process_penalty_shot(self.ctx, interaction, "middle", self.bet_amount)
 
-    @discord.ui.button(label="Right", style=discord.ButtonStyle.primary, emoji="➡️")
+    @discord.ui.button(label="Right", style=discord.ButtonStyle.primary, emoji="➡️", custom_id="right")
     async def right_button(self, button, interaction: discord.Interaction):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
@@ -250,26 +251,32 @@ class PenaltyCog(commands.Cog):
 
         # Create start embed
         embed = discord.Embed(
-            title="⚽ Penalty Kick",
+            title="⚽ PENALTY KICK ⚽",
             description=(
                 f"**Bet:** {bet_amount:,.2f} {currency_type}\n\n"
-                "Choose where to shoot:"
+                "**Choose where to shoot by clicking one of the buttons below!**\n"
+                "**Win 1.5x your bet if you score!**"
             ),
             color=0x00FFAE
         )
 
-        # Visual representation using emoji
+        # Visual representation using emoji - bigger and more clear
         field_value = (
             "```\n"
-            "⚽  GOAL  ⚽\n"
-            "+-----------+\n"
-            "|  L  M  R  |\n"
-            "|     🧤    |\n"
-            "+-----------+\n"
+            "╔═════════════════════╗\n"
+            "║      ⚽  GOAL  ⚽     ║\n"
+            "╠═════════════════════╣\n"
+            "║                     ║\n"
+            "║     LEFT   MID   RIGHT    ║\n"
+            "║       ↙     ↑     ↘       ║\n"
+            "║                     ║\n"
+            "║          🧤         ║\n"
+            "║     GOALKEEPER      ║\n"
+            "╚═════════════════════╝\n"
             "```"
         )
-        embed.add_field(name="Penalty Setup", value=field_value, inline=False)
-        embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
+        embed.add_field(name="Choose Your Shot Direction", value=field_value, inline=False)
+        embed.set_footer(text="BetSync Casino | Click a button to shoot!", icon_url=self.bot.user.avatar.url)
 
         # Delete loading message
         await loading_message.delete()
@@ -296,29 +303,17 @@ class PenaltyCog(commands.Cog):
         multiplier = 1.5
         winnings = bet_amount * multiplier if goal_scored else 0
 
-        # Prepare visual representation
-        shot_symbol = {
-            "left": "L",
-            "middle": "M",
-            "right": "R"
-        }
-
-        goalkeeper_symbol = {
-            "left": "🧤  •  •",
-            "middle": "•  🧤  •",
-            "right": "•  •  🧤"
-        }
-
-        ball_position = {
-            "left": "⚽  •  •",
-            "middle": "•  ⚽  •",
-            "right": "•  •  ⚽"
+        # User and GK direction symbols for the ASCII art
+        directions = {
+            "left": "LEFT",
+            "middle": "MID",
+            "right": "RIGHT"
         }
 
         # Create result embed
         if goal_scored:
-            title = "🎉 GOAL! You scored!"
-            description = f"You shot **{shot_direction}**, the goalkeeper dove **{goalkeeper_direction}**.\n\n**You won {winnings:,.2f} credits!**"
+            title = "🎉 GOAL! YOU SCORED! 🎉"
+            description = f"You shot **{shot_direction.upper()}**, the goalkeeper dove **{goalkeeper_direction.upper()}**.\n\n**You won {winnings:,.2f} credits!**"
             color = 0x00FF00  # Green for win
 
             # Update user balance with winnings
@@ -328,30 +323,56 @@ class PenaltyCog(commands.Cog):
             # Update statistics
             db.update_game_statistics(ctx.author.id, bet_amount, winnings, True)
 
+            # Create ASCII art for goal
+            if shot_direction == "left":
+                ball_pos = "⚽  •  •"
+            elif shot_direction == "middle":
+                ball_pos = "•  ⚽  •"
+            else:
+                ball_pos = "•  •  ⚽"
+                
+            if goalkeeper_direction == "left":
+                gk_pos = "🧤  •  •"
+            elif goalkeeper_direction == "middle":
+                gk_pos = "•  🧤  •"
+            else:
+                gk_pos = "•  •  🧤"
+
             result_ascii = (
                 "```\n"
-                "⚽  GOAL!  ⚽\n"
-                "+-----------+\n"
-                f"| {ball_position[shot_direction]} |\n"
-                f"| {goalkeeper_symbol[goalkeeper_direction]} |\n"
-                "+-----------+\n"
+                "╔═════════════════════╗\n"
+                "║      ⚽ GOAL! ⚽     ║\n"
+                "╠═════════════════════╣\n"
+                "║                     ║\n"
+                f"║ YOUR SHOT: {directions[shot_direction]}      ║\n"
+                f"║ {ball_pos}         ║\n"
+                "║                     ║\n"
+                f"║ GOALKEEPER: {directions[goalkeeper_direction]}    ║\n"
+                f"║ {gk_pos}         ║\n"
+                "╚═════════════════════╝\n"
                 "```"
             )
         else:
-            title = "❌ SAVED! The goalkeeper stopped your shot!"
-            description = f"You shot **{shot_direction}**, the goalkeeper dove **{goalkeeper_direction}**.\n\n**You lost {bet_amount:,.2f} credits.**"
+            title = "❌ SAVED! THE GOALKEEPER STOPPED YOUR SHOT! ❌"
+            description = f"You shot **{shot_direction.upper()}**, the goalkeeper dove **{goalkeeper_direction.upper()}**.\n\n**You lost {bet_amount:,.2f} credits.**"
             color = 0xFF0000  # Red for loss
 
             # Update statistics
             db = Users()
             db.update_game_statistics(ctx.author.id, bet_amount, 0, False)
 
+            # Create ASCII art for save
             result_ascii = (
                 "```\n"
-                "❌  SAVED  ❌\n"
-                "+-----------+\n"
-                f"| {goalkeeper_symbol[goalkeeper_direction]} |\n"
-                "+-----------+\n"
+                "╔═════════════════════╗\n"
+                "║      ❌ SAVED! ❌     ║\n"
+                "╠═════════════════════╣\n"
+                "║                     ║\n"
+                f"║ YOUR SHOT: {directions[shot_direction]}      ║\n"
+                f"║ GOALKEEPER: {directions[goalkeeper_direction]}    ║\n"
+                "║                     ║\n"
+                "║      🧤 SAVED ⚽     ║\n"
+                "╚═════════════════════╝\n"
                 "```"
             )
 
@@ -362,7 +383,7 @@ class PenaltyCog(commands.Cog):
             color=color
         )
         embed.add_field(name="Result", value=result_ascii, inline=False)
-        embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
+        embed.set_footer(text="BetSync Casino | Want to try again?", icon_url=self.bot.user.avatar.url)
 
         # Add betting history
         server_db = Servers()
