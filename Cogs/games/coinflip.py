@@ -9,12 +9,13 @@ from Cogs.utils.emojis import emoji
 
 
 class PlayAgainView(discord.ui.View):
-    def __init__(self, cog, ctx, bet_amount, timeout=60):
+    def __init__(self, cog, ctx, bet_amount, side=None, timeout=15):
         super().__init__(timeout=timeout)
         self.cog = cog
         self.ctx = ctx
         self.bet_amount = bet_amount
-        self.currency_used = None
+        self.side = side
+        self.message = None
 
     @discord.ui.button(label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄")
     async def play_again(self, button, interaction: discord.Interaction):
@@ -59,8 +60,11 @@ class PlayAgainView(discord.ui.View):
                     child.disabled = True
                 await i.response.edit_message(view=confirm_view)
                 
-                # Start a new game with max amount
-                await self.cog.coinflip(self.ctx, str(bet_amount))
+                # Start a new game with max amount, passing the previous side choice
+                if self.side:
+                    await self.cog.coinflip(self.ctx, str(bet_amount), None, self.side)
+                else:
+                    await self.cog.coinflip(self.ctx, str(bet_amount))
             
             @discord.ui.button(label="No", style=discord.ButtonStyle.danger)
             async def cancel_button(b, i):
@@ -79,7 +83,23 @@ class PlayAgainView(discord.ui.View):
         else:
             # User can afford the same bet
             await interaction.followup.send("Starting a new game with the same bet...", ephemeral=True)
-            await self.cog.coinflip(self.ctx, str(self.bet_amount))
+            # Pass the previous side choice if available
+            if self.side:
+                await self.cog.coinflip(self.ctx, str(self.bet_amount), None, self.side)
+            else:
+                await self.cog.coinflip(self.ctx, str(self.bet_amount))
+    
+    async def on_timeout(self):
+        # Disable button after timeout
+        for item in self.children:
+            item.disabled = True
+        
+        # Try to update the message if it exists
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except Exception as e:
+                print(f"Error updating message on timeout: {e}")
 
 
 class CoinflipCog(commands.Cog):
@@ -436,11 +456,14 @@ class CoinflipCog(commands.Cog):
 
             result_embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
             
-            # Create view with play again button
-            play_again_view = PlayAgainView(self, ctx, total_bet)
+            # Create view with play again button, including the player's choice for next game
+            play_again_view = PlayAgainView(self, ctx, total_bet, side)
             
             # Update message with result
             await message.edit(embed=result_embed, view=play_again_view)
+            
+            # Store message reference in view for timeout handling
+            play_again_view.message = message
             
             # Clear ongoing game
             if ctx.author.id in self.ongoing_games:
