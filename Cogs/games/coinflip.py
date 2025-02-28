@@ -343,8 +343,8 @@ class CoinflipCog(commands.Cog):
             if user_won:
                 winnings = total_bet * multiplier
                 
-                # Update user balance
-                db.update_balance(ctx.author.id, winnings, "credits")
+                # Update user balance - use increment operator to add to existing balance
+                db.update_balance(ctx.author.id, winnings, "credits", "$inc")
                 
                 # Add to win history
                 win_entry = {
