@@ -271,30 +271,28 @@ class PenaltyCog(commands.Cog):
         if credits_used > 0:
             db.update_balance(ctx.author.id, -credits_used, "credits", "$inc")
 
-        # Create a simpler and cleaner start embed
+        # Create a very simple and clear embed
         embed = discord.Embed(
-            title="⚽ PENALTY KICK ⚽",
+            title="⚽ PENALTY KICK",
             description=(
-                f"**Bet:** {bet_amount:,.2f} {currency_type}\n"
-                "**Win 1.5x your bet if you score!**\n\n"
-                "**Choose a direction to shoot:**"
+                f"**Your bet:** {bet_amount:,.2f} {currency_type}\n"
+                f"**Potential win:** {bet_amount*1.5:,.2f} credits\n\n"
+                "**Choose where to shoot:**"
             ),
             color=0x00FFAE
         )
 
-        # Simpler visual representation
+        # Ultra simple visual representation
         field_value = (
             "```\n"
-            "       ╔═══════════╗\n"
-            "       ║   GOAL    ║\n"
-            "       ╚═══════════╝\n"
-            "           ⚽  🧤\n"
-            "      ↙      ↑      ↘\n"
-            "    LEFT    MID   RIGHT\n"
+            "    [GOAL]    \n"
+            "   🥅 🥅 🥅   \n"
+            "     🧤       \n\n"
+            " LEFT  MID  RIGHT\n"
             "```"
         )
-        embed.add_field(name="⬇️ Choose a button below ⬇️", value=field_value, inline=False)
-        embed.set_footer(text="BetSync Casino | Click a button to shoot!", icon_url=self.bot.user.avatar.url)
+        embed.add_field(name="Click a button below to shoot", value=field_value, inline=False)
+        embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
 
         # Delete loading message
         await loading_message.delete()
@@ -344,33 +342,13 @@ class PenaltyCog(commands.Cog):
                 {"$inc": {"total_played": 1, "total_won": 1, "total_earned": winnings}}
             )
 
-            # Create ASCII art for goal
-            if shot_direction == "left":
-                ball_pos = "⚽  •  •"
-            elif shot_direction == "middle":
-                ball_pos = "•  ⚽  •"
-            else:
-                ball_pos = "•  •  ⚽"
-                
-            if goalkeeper_direction == "left":
-                gk_pos = "🧤  •  •"
-            elif goalkeeper_direction == "middle":
-                gk_pos = "•  🧤  •"
-            else:
-                gk_pos = "•  •  🧤"
-
+            # Create simple ASCII art for goal
             result_ascii = (
                 "```\n"
-                "╔═════════════════════╗\n"
-                "║      ⚽ GOAL! ⚽     ║\n"
-                "╠═════════════════════╣\n"
-                "║                     ║\n"
-                f"║ YOUR SHOT: {directions[shot_direction]}      ║\n"
-                f"║ {ball_pos}         ║\n"
-                "║                     ║\n"
-                f"║ GOALKEEPER: {directions[goalkeeper_direction]}    ║\n"
-                f"║ {gk_pos}         ║\n"
-                "╚═════════════════════╝\n"
+                "    GOAL! ⚽     \n"
+                "   🥅 🥅 🥅   \n\n"
+                f"You shot: {shot_direction.upper()}\n"
+                f"Goalkeeper: {goalkeeper_direction.upper()}\n"
                 "```"
             )
         else:
@@ -385,18 +363,13 @@ class PenaltyCog(commands.Cog):
                 {"$inc": {"total_played": 1, "total_lost": 1, "total_spent": bet_amount}}
             )
 
-            # Create ASCII art for save
+            # Create simple ASCII art for save
             result_ascii = (
                 "```\n"
-                "╔═════════════════════╗\n"
-                "║      ❌ SAVED! ❌     ║\n"
-                "╠═════════════════════╣\n"
-                "║                     ║\n"
-                f"║ YOUR SHOT: {directions[shot_direction]}      ║\n"
-                f"║ GOALKEEPER: {directions[goalkeeper_direction]}    ║\n"
-                "║                     ║\n"
-                "║      🧤 SAVED ⚽     ║\n"
-                "╚═════════════════════╝\n"
+                "    SAVED! 🧤     \n"
+                "   🥅 🥅 🥅   \n\n"
+                f"You shot: {shot_direction.upper()}\n"
+                f"Goalkeeper: {goalkeeper_direction.upper()}\n"
                 "```"
             )
 
@@ -431,11 +404,14 @@ class PenaltyCog(commands.Cog):
         # Update server history
         server_id = ctx.guild.id if ctx.guild else None
         if server_id:
-            server_db.add_bet_to_history(server_id, game_data)
+            server_db.update_history(server_id, game_data)
 
         # Update user history
         db = Users()
-        db.update_user_history(ctx.author.id, game_data)
+        db.collection.update_one(
+            {"discord_id": ctx.author.id},
+            {"$push": {"history": {"$each": [game_data], "$slice": -100}}}
+        )
 
         # Create "Play Again" button
         play_again_view = PlayAgainView(self, ctx, bet_amount, timeout=15)
