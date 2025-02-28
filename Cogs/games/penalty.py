@@ -271,27 +271,16 @@ class PenaltyCog(commands.Cog):
         if credits_used > 0:
             db.update_balance(ctx.author.id, -credits_used, "credits", "$inc")
 
-        # Create a very simple and clear embed
+        # Create a simple text-based embed
         embed = discord.Embed(
             title="⚽ PENALTY KICK",
             description=(
                 f"**Your bet:** {bet_amount:,.2f} {currency_type}\n"
                 f"**Potential win:** {bet_amount*1.5:,.2f} credits\n\n"
-                "**Choose where to shoot:**"
+                "**Choose where to shoot by clicking a button below:**"
             ),
             color=0x00FFAE
         )
-
-        # Ultra simple visual representation
-        field_value = (
-            "```\n"
-            "    [GOAL]    \n"
-            "   🥅 🥅 🥅   \n"
-            "     🧤       \n\n"
-            " LEFT  MID  RIGHT\n"
-            "```"
-        )
-        embed.add_field(name="Click a button below to shoot", value=field_value, inline=False)
         embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
 
         # Delete loading message
@@ -342,15 +331,8 @@ class PenaltyCog(commands.Cog):
                 {"$inc": {"total_played": 1, "total_won": 1, "total_earned": winnings}}
             )
 
-            # Create simple ASCII art for goal
-            result_ascii = (
-                "```\n"
-                "    GOAL! ⚽     \n"
-                "   🥅 🥅 🥅   \n\n"
-                f"You shot: {shot_direction.upper()}\n"
-                f"Goalkeeper: {goalkeeper_direction.upper()}\n"
-                "```"
-            )
+            # Simple text description
+            result_text = f"**You shot {shot_direction.upper()} and the goalkeeper went {goalkeeper_direction.upper()}!**"
         else:
             title = "❌ SAVED! THE GOALKEEPER STOPPED YOUR SHOT! ❌"
             description = f"You shot **{shot_direction.upper()}**, the goalkeeper dove **{goalkeeper_direction.upper()}**.\n\n**You lost {bet_amount:,.2f} credits.**"
@@ -363,23 +345,15 @@ class PenaltyCog(commands.Cog):
                 {"$inc": {"total_played": 1, "total_lost": 1, "total_spent": bet_amount}}
             )
 
-            # Create simple ASCII art for save
-            result_ascii = (
-                "```\n"
-                "    SAVED! 🧤     \n"
-                "   🥅 🥅 🥅   \n\n"
-                f"You shot: {shot_direction.upper()}\n"
-                f"Goalkeeper: {goalkeeper_direction.upper()}\n"
-                "```"
-            )
+            # Simple text description
+            result_text = f"**You shot {shot_direction.upper()} and the goalkeeper went {goalkeeper_direction.upper()}!**"
 
         # Create embed
         embed = discord.Embed(
             title=title,
-            description=description,
+            description=f"{result_text}\n\n{description}",
             color=color
         )
-        embed.add_field(name="Result", value=result_ascii, inline=False)
         embed.set_footer(text="BetSync Casino | Want to try again?", icon_url=self.bot.user.avatar.url)
 
         # Add betting history
