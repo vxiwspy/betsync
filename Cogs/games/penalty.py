@@ -104,8 +104,7 @@ class PenaltyButtonView(discord.ui.View):
         if self.message:
             try:
                 await self.message.edit(view=self)
-                await self.ctx.send(f"{self.ctx.author.mention}, your penalty game has timed out!")
-
+                
                 # Remove from ongoing games
                 if self.ctx.author.id in self.cog.ongoing_games:
                     del self.cog.ongoing_games[self.ctx.author.id]
@@ -167,14 +166,7 @@ class PenaltyCog(commands.Cog):
             elif currency_type == "credit" or currency_type == "credit":
                 currency_type = "credits"
 
-        # We only accept credits for this game
-        if currency_type == "tokens":
-            embed = discord.Embed(
-                title="<:no:1344252518305234987> | Invalid Currency",
-                description="Penalty game only accepts credits as currency.",
-                color=0xFF0000
-            )
-            return await ctx.reply(embed=embed)
+        # Currency handling is done below - we'll accept tokens but payout in credits
 
         # Validate bet amount
         try:
@@ -194,26 +186,67 @@ class PenaltyCog(commands.Cog):
             )
             return await ctx.reply(embed=embed)
 
-        # Check if the user has enough balance
-        if user_data[currency_type] < bet_amount:
-            embed = discord.Embed(
-                title="<:no:1344252518305234987> | Insufficient Balance",
-                description=f"You don't have enough {currency_type} to place this bet.",
-                color=0xFF0000
-            )
-            return await ctx.reply(embed=embed)
+        # Get user balances
+        tokens_balance = user_data['tokens']
+        credits_balance = user_data['credits']
+
+        # Determine which currency to use
+        tokens_used = 0
+        credits_used = 0
+
+        if currency_type == 'tokens':
+            # User specifically wants to use tokens
+            if bet_amount <= tokens_balance:
+                tokens_used = bet_amount
+            else:
+                embed = discord.Embed(
+                    title="<:no:1344252518305234987> | Insufficient Tokens",
+                    description=f"You don't have enough tokens. Your balance: **{tokens_balance:,.2f} tokens**",
+                    color=0xFF0000
+                )
+                return await ctx.reply(embed=embed)
+        elif currency_type == 'credits':
+            # User specifically wants to use credits
+            if bet_amount <= credits_balance:
+                credits_used = bet_amount
+            else:
+                embed = discord.Embed(
+                    title="<:no:1344252518305234987> | Insufficient Credits",
+                    description=f"You don't have enough credits. Your balance: **{credits_balance:,.2f} credits**",
+                    color=0xFF0000
+                )
+                return await ctx.reply(embed=embed)
+        else:
+            # Auto determine what to use
+            if bet_amount <= tokens_balance:
+                tokens_used = bet_amount
+            elif bet_amount <= credits_balance:
+                credits_used = bet_amount
+            elif bet_amount <= tokens_balance + credits_balance:
+                # Use all tokens and some credits
+                tokens_used = tokens_balance
+                credits_used = bet_amount - tokens_balance
+            else:
+                embed = discord.Embed(
+                    title="<:no:1344252518305234987> | Insufficient Funds",
+                    description=f"You don't have enough funds. Your balance: **{tokens_balance:,.2f} tokens** and **{credits_balance:,.2f} credits**",
+                    color=0xFF0000
+                )
+                return await ctx.reply(embed=embed)
 
         # Loading message
         loading_message = await ctx.reply("⚽ Setting up the penalty kick...")
 
         # Mark game as ongoing
         self.ongoing_games[ctx.author.id] = {
-            "currency_type": currency_type,
             "bet_amount": bet_amount
         }
 
         # Deduct bet from user's balance
-        db.update_balance(ctx.author.id, -bet_amount, currency_type, "$inc")
+        if tokens_used > 0:
+            db.update_balance(ctx.author.id, -tokens_used, "tokens", "$inc")
+        if credits_used > 0:
+            db.update_balance(ctx.author.id, -credits_used, "credits", "$inc")
 
         # Create start embed
         embed = discord.Embed(
@@ -333,12 +366,15 @@ class PenaltyCog(commands.Cog):
 
         # Add betting history
         server_db = Servers()
+        used_currency = "tokens" if tokens_used > 0 else "credits"
+        bet_amount_used = tokens_used if tokens_used > 0 else credits_used
+        
         game_data = {
             "game": "penalty",
             "user_id": ctx.author.id,
             "user_name": str(ctx.author),
-            "bet_amount": bet_amount,
-            "currency_type": "credits",
+            "bet_amount": bet_amount_used,
+            "currency_type": used_currency,
             "multiplier": multiplier if goal_scored else 0,
             "winnings": winnings,
             "choice": shot_direction,
