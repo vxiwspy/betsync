@@ -471,34 +471,39 @@ class PenaltyCog(commands.Cog):
 
     def update_bet_history(self, ctx, game_type, bet_amount, user_choice, ai_choice, won, multiplier, winnings):
         """Update bet history in database"""
-        # Add betting history
-        server_db = Servers()
+        # Create timestamp
+        timestamp = int(datetime.utcnow().timestamp())
         
+        # Create game data
         game_data = {
             "game": game_type,
-            "user_id": ctx.author.id,
-            "user_name": str(ctx.author),
-            "bet_amount": bet_amount,
-            "currency_type": "credits",  # Always record payouts in credits
+            "type": "win" if won else "loss",
+            "bet": bet_amount,
+            "amount": winnings if won else bet_amount,
             "multiplier": multiplier if won else 0,
-            "winnings": winnings,
             "choice": user_choice,
             "outcome": ai_choice,
             "win": won,
-            "time": datetime.utcnow()
+            "timestamp": timestamp
         }
-
-        # Update server history
-        server_id = ctx.guild.id if ctx.guild else None
-        if server_id:
-            server_db.update_history(server_id, game_data)
-
+        
         # Update user history
         db = Users()
         db.collection.update_one(
             {"discord_id": ctx.author.id},
             {"$push": {"history": {"$each": [game_data], "$slice": -100}}}
         )
+
+        # Update server history with additional user information
+        server_db = Servers()
+        server_id = ctx.guild.id if ctx.guild else None
+        
+        if server_id:
+            server_game_data = game_data.copy()
+            server_game_data["user_id"] = ctx.author.id
+            server_game_data["user_name"] = str(ctx.author)
+            
+            server_db.update_history(server_id, server_game_data)
 
 
 def setup(bot):
