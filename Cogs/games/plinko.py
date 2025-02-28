@@ -1103,63 +1103,56 @@ class PlinkoCog(commands.Cog):
                     outline=None
                 )
                 
-                # If multiple balls landed here, draw a gradient or pattern
+                # If multiple balls landed here, draw ball indicators
                 if len(balls_at_slot) > 1:
-                    # Draw a striped border for multiple balls
-                    stripe_width = max(2, int(3 * scale_factor))
-                    segment_length = (text_bbox[2] - text_bbox[0] + padding * 2) / len(balls_at_slot)
+                    # Draw a full border
+                    border_width = max(2, int(3 * scale_factor))
+                    draw.rectangle(
+                        (
+                            text_bbox[0] - padding,
+                            text_bbox[1] - padding,
+                            text_bbox[2] + padding,
+                            text_bbox[3] + padding
+                        ),
+                        outline=(255, 255, 255),  # White outline
+                        width=border_width
+                    )
                     
+                    # Draw small ball indicators in a row above the multiplier
+                    indicator_size = max(8, int(12 * scale_factor))
+                    spacing = indicator_size * 1.5
+                    
+                    # Calculate starting position for the row of indicators
+                    # Center the indicators above the multiplier text
+                    total_width = (len(balls_at_slot) - 1) * spacing + indicator_size
+                    start_x = x - total_width / 2
+                    indicator_y = text_bbox[1] - padding * 2 - indicator_size
+                    
+                    # Draw each ball indicator
                     for k, ball_idx in enumerate(balls_at_slot):
                         color_idx = ball_idx % len(ball_colors)
-                        # Draw a segment of the border with this ball's color
-                        segment_start = text_bbox[0] - padding + k * segment_length
-                        segment_end = segment_start + segment_length
+                        indicator_x = start_x + k * spacing
                         
-                        # Top border
-                        draw.rectangle(
+                        # Draw the ball circle
+                        draw.ellipse(
                             (
-                                segment_start,
-                                text_bbox[1] - padding,
-                                segment_end,
-                                text_bbox[1] - padding + stripe_width
+                                indicator_x - indicator_size/2,
+                                indicator_y - indicator_size/2,
+                                indicator_x + indicator_size/2,
+                                indicator_y + indicator_size/2
                             ),
                             fill=ball_colors[color_idx]
                         )
                         
-                        # Bottom border
-                        draw.rectangle(
-                            (
-                                segment_start,
-                                text_bbox[3] + padding - stripe_width,
-                                segment_end,
-                                text_bbox[3] + padding
-                            ),
-                            fill=ball_colors[color_idx]
+                        # Add the ball number text
+                        number_font = ImageFont.truetype("roboto.ttf", int(indicator_size * 0.8))
+                        draw.text(
+                            (indicator_x, indicator_y),
+                            str(ball_idx + 1),
+                            font=number_font,
+                            fill=(0, 0, 0),
+                            anchor="mm"
                         )
-                        
-                        # Left border (only for first segment)
-                        if k == 0:
-                            draw.rectangle(
-                                (
-                                    text_bbox[0] - padding,
-                                    text_bbox[1] - padding,
-                                    text_bbox[0] - padding + stripe_width,
-                                    text_bbox[3] + padding
-                                ),
-                                fill=ball_colors[color_idx]
-                            )
-                        
-                        # Right border (only for last segment)
-                        if k == len(balls_at_slot) - 1:
-                            draw.rectangle(
-                                (
-                                    text_bbox[2] + padding - stripe_width,
-                                    text_bbox[1] - padding,
-                                    text_bbox[2] + padding,
-                                    text_bbox[3] + padding
-                                ),
-                                fill=ball_colors[color_idx]
-                            )
                 else:
                     # Single ball - draw a solid border
                     ball_idx = balls_at_slot[0]
