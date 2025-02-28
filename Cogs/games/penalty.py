@@ -1,12 +1,157 @@
 
-import os
 import discord
 import random
-import asyncio
 from discord.ext import commands
 from datetime import datetime
-
 from Cogs.utils.mongo import Users, Servers
+
+class RoleSelectionView(discord.ui.View):
+    def __init__(self, cog, ctx, bet_amount, currency_type, timeout=30):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.ctx = ctx
+        self.bet_amount = bet_amount
+        self.currency_type = currency_type
+        self.message = None
+
+    @discord.ui.button(label="Penalty Taker", style=discord.ButtonStyle.primary, emoji="⚽", custom_id="taker")
+    async def taker_button(self, button, interaction: discord.Interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        # Disable all buttons to prevent multiple clicks
+        for child in self.children:
+            child.disabled = True
+        
+        await interaction.response.edit_message(view=self)
+        
+        # Start game as penalty taker
+        await self.cog.start_as_taker(self.ctx, interaction, self.bet_amount, self.currency_type)
+
+    @discord.ui.button(label="Goalkeeper", style=discord.ButtonStyle.success, emoji="🧤", custom_id="goalkeeper")
+    async def goalkeeper_button(self, button, interaction: discord.Interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        # Disable all buttons to prevent multiple clicks
+        for child in self.children:
+            child.disabled = True
+        
+        await interaction.response.edit_message(view=self)
+        
+        # Start game as goalkeeper
+        await self.cog.start_as_goalkeeper(self.ctx, interaction, self.bet_amount, self.currency_type)
+
+    async def on_timeout(self):
+        # Disable all buttons when the view times out
+        for child in self.children:
+            child.disabled = True
+
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+                
+                # Remove from ongoing games
+                if self.ctx.author.id in self.cog.ongoing_games:
+                    del self.cog.ongoing_games[self.ctx.author.id]
+            except:
+                pass
+
+
+class PenaltyButtonView(discord.ui.View):
+    def __init__(self, cog, ctx, bet_amount, role="taker", timeout=30):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.ctx = ctx
+        self.bet_amount = bet_amount
+        self.role = role
+        self.message = None
+        self.clicked = False  # Prevent multiple clicks
+
+    @discord.ui.button(label="Left", style=discord.ButtonStyle.primary, emoji="⬅️", custom_id="left")
+    async def left_button(self, button, interaction: discord.Interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        if self.clicked:
+            return await interaction.response.send_message("You've already made your choice!", ephemeral=True)
+            
+        self.clicked = True  # Mark that a button has been clicked
+
+        # Disable all buttons to prevent multiple clicks
+        for child in self.children:
+            child.disabled = True
+        
+        # Acknowledge the interaction first
+        await interaction.response.edit_message(view=self)
+        
+        # Process the choice based on role
+        if self.role == "taker":
+            await self.cog.process_penalty_shot(self.ctx, interaction, "left", self.bet_amount)
+        else:
+            await self.cog.process_goalkeeper_save(self.ctx, interaction, "left", self.bet_amount)
+
+    @discord.ui.button(label="Middle", style=discord.ButtonStyle.primary, emoji="⬆️", custom_id="middle")
+    async def middle_button(self, button, interaction: discord.Interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        if self.clicked:
+            return await interaction.response.send_message("You've already made your choice!", ephemeral=True)
+            
+        self.clicked = True  # Mark that a button has been clicked
+
+        # Disable all buttons to prevent multiple clicks
+        for child in self.children:
+            child.disabled = True
+        
+        # Acknowledge the interaction first
+        await interaction.response.edit_message(view=self)
+        
+        # Process the choice based on role
+        if self.role == "taker":
+            await self.cog.process_penalty_shot(self.ctx, interaction, "middle", self.bet_amount)
+        else:
+            await self.cog.process_goalkeeper_save(self.ctx, interaction, "middle", self.bet_amount)
+
+    @discord.ui.button(label="Right", style=discord.ButtonStyle.primary, emoji="➡️", custom_id="right")
+    async def right_button(self, button, interaction: discord.Interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        if self.clicked:
+            return await interaction.response.send_message("You've already made your choice!", ephemeral=True)
+            
+        self.clicked = True  # Mark that a button has been clicked
+
+        # Disable all buttons to prevent multiple clicks
+        for child in self.children:
+            child.disabled = True
+        
+        # Acknowledge the interaction first
+        await interaction.response.edit_message(view=self)
+        
+        # Process the choice based on role
+        if self.role == "taker":
+            await self.cog.process_penalty_shot(self.ctx, interaction, "right", self.bet_amount)
+        else:
+            await self.cog.process_goalkeeper_save(self.ctx, interaction, "right", self.bet_amount)
+
+    async def on_timeout(self):
+        # Disable all buttons when the view times out
+        for child in self.children:
+            child.disabled = True
+
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+                
+                # Remove from ongoing games
+                if self.ctx.author.id in self.cog.ongoing_games:
+                    del self.cog.ongoing_games[self.ctx.author.id]
+            except:
+                pass
+
 
 class PlayAgainView(discord.ui.View):
     def __init__(self, cog, ctx, bet_amount, timeout=15):
@@ -42,95 +187,10 @@ class PlayAgainView(discord.ui.View):
     async def on_timeout(self):
         for child in self.children:
             child.disabled = True
-
+        
         if self.message:
             try:
                 await self.message.edit(view=self)
-            except:
-                pass
-
-
-class PenaltyButtonView(discord.ui.View):
-    def __init__(self, cog, ctx, bet_amount, timeout=30):
-        super().__init__(timeout=timeout)
-        self.cog = cog
-        self.ctx = ctx
-        self.bet_amount = bet_amount
-        self.message = None
-        self.clicked = False  # Prevent multiple clicks
-
-    @discord.ui.button(label="Left", style=discord.ButtonStyle.primary, emoji="⬅️", custom_id="left")
-    async def left_button(self, button, interaction: discord.Interaction):
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This is not your game!", ephemeral=True)
-        
-        if self.clicked:
-            return await interaction.response.send_message("You've already made your shot!", ephemeral=True)
-            
-        self.clicked = True  # Mark that a button has been clicked
-
-        # Disable all buttons to prevent multiple clicks
-        for child in self.children:
-            child.disabled = True
-        
-        # Acknowledge the interaction first
-        await interaction.response.edit_message(view=self)
-        
-        # Then process the shot
-        await self.cog.process_penalty_shot(self.ctx, interaction, "left", self.bet_amount)
-
-    @discord.ui.button(label="Middle", style=discord.ButtonStyle.primary, emoji="⬆️", custom_id="middle")
-    async def middle_button(self, button, interaction: discord.Interaction):
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This is not your game!", ephemeral=True)
-        
-        if self.clicked:
-            return await interaction.response.send_message("You've already made your shot!", ephemeral=True)
-            
-        self.clicked = True  # Mark that a button has been clicked
-
-        # Disable all buttons to prevent multiple clicks
-        for child in self.children:
-            child.disabled = True
-        
-        # Acknowledge the interaction first
-        await interaction.response.edit_message(view=self)
-        
-        # Then process the shot
-        await self.cog.process_penalty_shot(self.ctx, interaction, "middle", self.bet_amount)
-
-    @discord.ui.button(label="Right", style=discord.ButtonStyle.primary, emoji="➡️", custom_id="right")
-    async def right_button(self, button, interaction: discord.Interaction):
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This is not your game!", ephemeral=True)
-        
-        if self.clicked:
-            return await interaction.response.send_message("You've already made your shot!", ephemeral=True)
-            
-        self.clicked = True  # Mark that a button has been clicked
-
-        # Disable all buttons to prevent multiple clicks
-        for child in self.children:
-            child.disabled = True
-        
-        # Acknowledge the interaction first
-        await interaction.response.edit_message(view=self)
-        
-        # Then process the shot
-        await self.cog.process_penalty_shot(self.ctx, interaction, "right", self.bet_amount)
-
-    async def on_timeout(self):
-        # Disable all buttons when the view times out
-        for child in self.children:
-            child.disabled = True
-
-        if self.message:
-            try:
-                await self.message.edit(view=self)
-                
-                # Remove from ongoing games
-                if self.ctx.author.id in self.cog.ongoing_games:
-                    del self.cog.ongoing_games[self.ctx.author.id]
             except:
                 pass
 
@@ -142,127 +202,76 @@ class PenaltyCog(commands.Cog):
 
     @commands.command(aliases=["pen", "pk"])
     async def penalty(self, ctx, bet_amount: str = None, currency_type: str = None):
-        """Play penalty shootout - aim your shot and try to score!"""
+        """Play penalty shootout - choose to be a penalty taker or goalkeeper!"""
         if not bet_amount:
             embed = discord.Embed(
                 title="⚽ How to Play Penalty",
                 description=(
-                    "**Penalty** is a game where you take a penalty kick against a goalkeeper!\n\n"
+                    "**Penalty** is a game where you can be either a penalty taker or a goalkeeper!\n\n"
                     "**Usage:** `!penalty <amount> [currency_type]`\n"
                     "**Example:** `!penalty 100` or `!penalty 100 credits`\n\n"
-                    "- **Choose to shoot left, middle, or right**\n"
-                    "- **If the goalkeeper dives in a different direction, you score and win 1.5x your bet!**\n"
-                    "- **If the goalkeeper saves your shot, you lose your bet**\n"
+                    "**Choose your role:**\n"
+                    "- **As Penalty Taker:** Choose where to shoot (left/middle/right). If the goalkeeper dives in a different direction, you score and win 1.5x your bet!\n"
+                    "- **As Goalkeeper:** Choose where to dive (left/middle/right). If you guess correctly where the striker will shoot, you save and win 2.1x your bet!\n"
                 ),
                 color=0x00FFAE
             )
             embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
             return await ctx.reply(embed=embed)
 
-        # Check if the user already has an ongoing game
-        if ctx.author.id in self.ongoing_games:
-            embed = discord.Embed(
-                title="<:no:1344252518305234987> | Game In Progress",
-                description="You already have an ongoing game. Please finish it first.",
-                color=0xFF0000
-            )
-            return await ctx.reply(embed=embed)
+        # Check if currency type is valid
+        currency_type = currency_type.lower() if currency_type else "credits"
+        if currency_type not in ["credits", "tokens"]:
+            return await ctx.reply("Invalid currency type! Please use either 'credits' or 'tokens'.")
 
-        # Process bet info
+        # Check if bet amount is valid
+        try:
+            if bet_amount.lower() == "all":
+                db = Users()
+                user_data = db.fetch_user(ctx.author.id)
+                if not user_data:
+                    return await ctx.reply("Your account couldn't be found. Please try again later.")
+                
+                bet_amount = user_data[currency_type]
+                if bet_amount <= 0:
+                    return await ctx.reply(f"You don't have any {currency_type} to bet!")
+            else:
+                bet_amount = float(bet_amount)
+        except ValueError:
+            return await ctx.reply("Invalid bet amount! Please enter a number.")
+
+        # Check if bet amount is positive
+        if bet_amount <= 0:
+            return await ctx.reply("Bet amount must be positive!")
+
+        # Check if user has enough balance
         db = Users()
         user_data = db.fetch_user(ctx.author.id)
         if not user_data:
-            embed = discord.Embed(
-                title="<:no:1344252518305234987> | Account Not Found",
-                description="Your account couldn't be found. Please try again later.",
-                color=0xFF0000
-            )
-            return await ctx.reply(embed=embed)
-
-        # Determine currency type (default to credits)
-        if not currency_type or currency_type.lower() not in ["credits", "tokens"]:
-            currency_type = "credits"
-        else:
-            currency_type = currency_type.lower()
-            if currency_type == "token" or currency_type == "token":
-                currency_type = "tokens"
-            elif currency_type == "credit" or currency_type == "credit":
-                currency_type = "credits"
-
-        # Currency handling is done below - we'll accept tokens but payout in credits
-
-        # Validate bet amount
-        try:
-            bet_amount = float(bet_amount)
-            if bet_amount <= 0:
-                embed = discord.Embed(
-                    title="<:no:1344252518305234987> | Invalid Bet",
-                    description="Bet amount must be greater than 0.",
-                    color=0xFF0000
-                )
-                return await ctx.reply(embed=embed)
-        except ValueError:
-            embed = discord.Embed(
-                title="<:no:1344252518305234987> | Invalid Bet",
-                description="Bet amount must be a number.",
-                color=0xFF0000
-            )
-            return await ctx.reply(embed=embed)
-
-        # Get user balances
-        tokens_balance = user_data['tokens']
-        credits_balance = user_data['credits']
-
-        # Determine which currency to use
+            return await ctx.reply("Your account couldn't be found. Please try again later.")
+        
+        balance = user_data[currency_type]
+        
+        # Initialize tokens and credits used
         tokens_used = 0
         credits_used = 0
-
-        if currency_type == 'tokens':
-            # User specifically wants to use tokens
-            if bet_amount <= tokens_balance:
-                tokens_used = bet_amount
-            else:
-                embed = discord.Embed(
-                    title="<:no:1344252518305234987> | Insufficient Tokens",
-                    description=f"You don't have enough tokens. Your balance: **{tokens_balance:,.2f} tokens**",
-                    color=0xFF0000
-                )
-                return await ctx.reply(embed=embed)
-        elif currency_type == 'credits':
-            # User specifically wants to use credits
-            if bet_amount <= credits_balance:
-                credits_used = bet_amount
-            else:
-                embed = discord.Embed(
-                    title="<:no:1344252518305234987> | Insufficient Credits",
-                    description=f"You don't have enough credits. Your balance: **{credits_balance:,.2f} credits**",
-                    color=0xFF0000
-                )
-                return await ctx.reply(embed=embed)
+        
+        if balance < bet_amount:
+            return await ctx.reply(f"You don't have enough {currency_type} to place this bet! Your balance: {balance:,.2f} {currency_type}")
+        
+        # Set the amount used based on currency type
+        if currency_type == "tokens":
+            tokens_used = bet_amount
         else:
-            # Auto determine what to use
-            if bet_amount <= tokens_balance:
-                tokens_used = bet_amount
-            elif bet_amount <= credits_balance:
-                credits_used = bet_amount
-            elif bet_amount <= tokens_balance + credits_balance:
-                # Use all tokens and some credits
-                tokens_used = tokens_balance
-                credits_used = bet_amount - tokens_balance
-            else:
-                embed = discord.Embed(
-                    title="<:no:1344252518305234987> | Insufficient Funds",
-                    description=f"You don't have enough funds. Your balance: **{tokens_balance:,.2f} tokens** and **{credits_balance:,.2f} credits**",
-                    color=0xFF0000
-                )
-                return await ctx.reply(embed=embed)
+            credits_used = bet_amount
 
         # Loading message
-        loading_message = await ctx.reply("⚽ Setting up the penalty kick...")
+        loading_message = await ctx.reply("⚽ Setting up the penalty game...")
 
         # Mark game as ongoing
         self.ongoing_games[ctx.author.id] = {
-            "bet_amount": bet_amount
+            "bet_amount": bet_amount,
+            "currency_type": currency_type
         }
 
         # Deduct bet from user's balance
@@ -271,9 +280,31 @@ class PenaltyCog(commands.Cog):
         if credits_used > 0:
             db.update_balance(ctx.author.id, -credits_used, "credits", "$inc")
 
-        # Create a simple text-based embed
+        # Create role selection embed
         embed = discord.Embed(
-            title="⚽ PENALTY KICK",
+            title="⚽ PENALTY KICK - CHOOSE YOUR ROLE",
+            description=(
+                f"**Your bet:** {bet_amount:,.2f} {currency_type}\n\n"
+                "**Choose your role:**\n"
+                "**🧤 Goalkeeper:** You dive to save the shot. Win 2.1x if you save!\n"
+                "**⚽ Penalty Taker:** You shoot at goal. Win 1.5x if you score!"
+            ),
+            color=0x00FFAE
+        )
+        embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
+
+        # Delete loading message
+        await loading_message.delete()
+
+        # Create view with role selection buttons
+        view = RoleSelectionView(self, ctx, bet_amount, currency_type, timeout=30)
+        message = await ctx.reply(embed=embed, view=view)
+        view.message = message
+
+    async def start_as_taker(self, ctx, interaction, bet_amount, currency_type):
+        """Start the game as a penalty taker"""
+        embed = discord.Embed(
+            title="⚽ PENALTY KICK - YOU ARE THE TAKER",
             description=(
                 f"**Your bet:** {bet_amount:,.2f} {currency_type}\n"
                 f"**Potential win:** {bet_amount*1.5:,.2f} credits\n\n"
@@ -283,16 +314,31 @@ class PenaltyCog(commands.Cog):
         )
         embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
 
-        # Delete loading message
-        await loading_message.delete()
+        # Create view with shooting buttons
+        view = PenaltyButtonView(self, ctx, bet_amount, role="taker", timeout=30)
+        message = await interaction.followup.send(embed=embed, view=view)
+        view.message = message
 
-        # Create view with buttons
-        view = PenaltyButtonView(self, ctx, bet_amount, timeout=30)
-        message = await ctx.reply(embed=embed, view=view)
+    async def start_as_goalkeeper(self, ctx, interaction, bet_amount, currency_type):
+        """Start the game as a goalkeeper"""
+        embed = discord.Embed(
+            title="🧤 PENALTY KICK - YOU ARE THE GOALKEEPER",
+            description=(
+                f"**Your bet:** {bet_amount:,.2f} {currency_type}\n"
+                f"**Potential win:** {bet_amount*2.1:,.2f} credits\n\n"
+                "**Choose where to dive by clicking a button below:**"
+            ),
+            color=0x00FFAE
+        )
+        embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
+
+        # Create view with diving buttons
+        view = PenaltyButtonView(self, ctx, bet_amount, role="goalkeeper", timeout=30)
+        message = await interaction.followup.send(embed=embed, view=view)
         view.message = message
 
     async def process_penalty_shot(self, ctx, interaction, shot_direction, bet_amount):
-        """Process the penalty shot and determine the outcome"""
+        """Process the penalty shot when user is the taker"""
         # Remove from ongoing games
         if ctx.author.id in self.ongoing_games:
             del self.ongoing_games[ctx.author.id]
@@ -308,13 +354,6 @@ class PenaltyCog(commands.Cog):
         multiplier = 1.5
         winnings = bet_amount * multiplier if goal_scored else 0
 
-        # User and GK direction symbols for the ASCII art
-        directions = {
-            "left": "LEFT",
-            "middle": "MID",
-            "right": "RIGHT"
-        }
-
         # Create result embed
         if goal_scored:
             title = "🎉 GOAL! YOU SCORED! 🎉"
@@ -325,27 +364,27 @@ class PenaltyCog(commands.Cog):
             db = Users()
             db.update_balance(ctx.author.id, winnings, "credits", "$inc")
 
-            # Update statistics - instead of using update_game_statistics method
+            # Update statistics
             db.collection.update_one(
                 {"discord_id": ctx.author.id},
                 {"$inc": {"total_played": 1, "total_won": 1, "total_earned": winnings}}
             )
 
-            # Simple text description
+            # Result text
             result_text = f"**You shot {shot_direction.upper()} and the goalkeeper went {goalkeeper_direction.upper()}!**"
         else:
             title = "❌ SAVED! THE GOALKEEPER STOPPED YOUR SHOT! ❌"
             description = f"You shot **{shot_direction.upper()}**, the goalkeeper dove **{goalkeeper_direction.upper()}**.\n\n**You lost {bet_amount:,.2f} credits.**"
             color = 0xFF0000  # Red for loss
 
-            # Update statistics - instead of using update_game_statistics method
+            # Update statistics
             db = Users()
             db.collection.update_one(
                 {"discord_id": ctx.author.id},
                 {"$inc": {"total_played": 1, "total_lost": 1, "total_spent": bet_amount}}
             )
 
-            # Simple text description
+            # Result text
             result_text = f"**You shot {shot_direction.upper()} and the goalkeeper went {goalkeeper_direction.upper()}!**"
 
         # Create embed
@@ -357,21 +396,95 @@ class PenaltyCog(commands.Cog):
         embed.set_footer(text="BetSync Casino | Want to try again?", icon_url=self.bot.user.avatar.url)
 
         # Add betting history
+        self.update_bet_history(ctx, "penalty_taker", bet_amount, shot_direction, goalkeeper_direction, goal_scored, multiplier, winnings)
+
+        # Create "Play Again" button
+        play_again_view = PlayAgainView(self, ctx, bet_amount, timeout=15)
+        message = await interaction.followup.send(embed=embed, view=play_again_view)
+        play_again_view.message = message
+
+    async def process_goalkeeper_save(self, ctx, interaction, dive_direction, bet_amount):
+        """Process the penalty save when user is the goalkeeper"""
+        # Remove from ongoing games
+        if ctx.author.id in self.ongoing_games:
+            del self.ongoing_games[ctx.author.id]
+
+        # Striker picks a random direction
+        striker_directions = ["left", "middle", "right"]
+        striker_direction = random.choice(striker_directions)
+
+        # Determine the outcome
+        save_made = dive_direction == striker_direction
+
+        # Calculate winnings
+        multiplier = 2.1  # Higher multiplier for goalkeeper
+        winnings = bet_amount * multiplier if save_made else 0
+
+        # Create result embed
+        if save_made:
+            title = "🎉 SAVE! YOU STOPPED THE SHOT! 🎉"
+            description = f"You dove **{dive_direction.upper()}**, the striker shot **{striker_direction.upper()}**.\n\n**You won {winnings:,.2f} credits!**"
+            color = 0x00FF00  # Green for win
+
+            # Update user balance with winnings
+            db = Users()
+            db.update_balance(ctx.author.id, winnings, "credits", "$inc")
+
+            # Update statistics
+            db.collection.update_one(
+                {"discord_id": ctx.author.id},
+                {"$inc": {"total_played": 1, "total_won": 1, "total_earned": winnings}}
+            )
+
+            # Result text
+            result_text = f"**You dove {dive_direction.upper()} and the striker shot {striker_direction.upper()}!**"
+        else:
+            title = "❌ GOAL! THE STRIKER SCORED PAST YOU! ❌"
+            description = f"You dove **{dive_direction.upper()}**, the striker shot **{striker_direction.upper()}**.\n\n**You lost {bet_amount:,.2f} credits.**"
+            color = 0xFF0000  # Red for loss
+
+            # Update statistics
+            db = Users()
+            db.collection.update_one(
+                {"discord_id": ctx.author.id},
+                {"$inc": {"total_played": 1, "total_lost": 1, "total_spent": bet_amount}}
+            )
+
+            # Result text
+            result_text = f"**You dove {dive_direction.upper()} and the striker shot {striker_direction.upper()}!**"
+
+        # Create embed
+        embed = discord.Embed(
+            title=title,
+            description=f"{result_text}\n\n{description}",
+            color=color
+        )
+        embed.set_footer(text="BetSync Casino | Want to try again?", icon_url=self.bot.user.avatar.url)
+
+        # Add betting history
+        self.update_bet_history(ctx, "penalty_goalkeeper", bet_amount, dive_direction, striker_direction, save_made, multiplier, winnings)
+
+        # Create "Play Again" button
+        play_again_view = PlayAgainView(self, ctx, bet_amount, timeout=15)
+        message = await interaction.followup.send(embed=embed, view=play_again_view)
+        play_again_view.message = message
+
+    def update_bet_history(self, ctx, game_type, bet_amount, user_choice, ai_choice, won, multiplier, winnings):
+        """Update bet history in database"""
+        # Add betting history
         server_db = Servers()
-        # Get the pending game data to determine which currency was used
-        game_info = self.ongoing_games.get(ctx.author.id, {})
         
         game_data = {
-            "game": "penalty",
+            "game": game_type,
             "user_id": ctx.author.id,
             "user_name": str(ctx.author),
             "bet_amount": bet_amount,
             "currency_type": "credits",  # Always record payouts in credits
-            "multiplier": multiplier if goal_scored else 0,
+            "multiplier": multiplier if won else 0,
             "winnings": winnings,
-            "choice": shot_direction,
-            "outcome": goalkeeper_direction,
-            "win": goal_scored,
+            "choice": user_choice,
+            "outcome": ai_choice,
+            "win": won,
             "time": datetime.utcnow()
         }
 
@@ -386,11 +499,6 @@ class PenaltyCog(commands.Cog):
             {"discord_id": ctx.author.id},
             {"$push": {"history": {"$each": [game_data], "$slice": -100}}}
         )
-
-        # Create "Play Again" button
-        play_again_view = PlayAgainView(self, ctx, bet_amount, timeout=15)
-        message = await interaction.followup.send(embed=embed, view=play_again_view)
-        play_again_view.message = message
 
 
 def setup(bot):
