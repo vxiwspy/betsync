@@ -180,11 +180,11 @@ class Fetches(commands.Cog):
             self.all_data = all_data
             self.page_size = page_size
             self.current_page = 0
-            self.total_pages = max(1, (len(all_data) + page_size - 1) // page_size)
+            self.total_pages = max(1, (len(all_data["users"]) + page_size - 1) // page_size)
             self.message = None
             self.scope = all_data.get("scope", "global")
-            self.leaderboard_type = all_data.get("type", "balance")
-            self.currency = all_data.get("currency", "credits")
+            self.leaderboard_type = all_data.get("type", "stats")
+            self.stat_type = all_data.get("stat_type", "wins")
 
             # Disable buttons if not needed
             self.update_buttons()
@@ -239,45 +239,37 @@ class Fetches(commands.Cog):
             current_page_data = self.all_data["users"][start_idx:end_idx]
 
             # Create embed based on leaderboard type
-            if self.leaderboard_type == "balance":
-                return self.create_balance_embed(current_page_data, start_idx)
+            if self.leaderboard_type == "stats":
+                return self.create_stats_embed(current_page_data, start_idx)
             elif self.leaderboard_type == "wagered":
                 return self.create_wagered_embed(current_page_data, start_idx)
 
-            # Default to balance embed
-            return self.create_balance_embed(current_page_data, start_idx)
+            # Default to stats embed
+            return self.create_stats_embed(current_page_data, start_idx)
 
-        def create_balance_embed(self, users_data, start_idx):
-            currency_type = self.currency
+        def create_stats_embed(self, users_data, start_idx):
+            stat_type = self.stat_type
             scope_text = self.scope.capitalize()
-            currency_symbol = ":moneybag:" if currency_type == "tokens" else ":money_with_wings:"
+            stat_icon = "🏆" if stat_type == "wins" else "❌"
+            
+            title_text = "Wins" if stat_type == "wins" else "Losses"
 
             embed = discord.Embed(
-                title=f":trophy: {scope_text} {currency_type.capitalize()} Leaderboard",
-                description=f"Top users ranked by {currency_type} balance",
-                color=0x00FFAE
+                title=f"{stat_icon} {scope_text} {title_text} Leaderboard",
+                description=f"Top users ranked by total {stat_type}",
+                color=0x00FFAE if stat_type == "wins" else 0xFF5500
             )
 
             for i, user_data in enumerate(users_data):
                 # Calculate actual position on leaderboard
                 position = start_idx + i + 1
-
-                # Add medal emoji for top 3, no rank shown for others
-                if position == 1:
-                    medal = ":first_place:"
-                elif position == 2:
-                    medal = ":second_place:"
-                elif position == 3:
-                    medal = ":third_place:"
-                else:
-                    medal = ""  # No rank for positions below top 3
-
+                
                 # Format the amount with commas
-                balance = f"{user_data['amount']:,.2f}"
-
+                stat_value = f"{user_data['amount']:,.0f}"
+                
                 embed.add_field(
-                    name=f"{medal} {user_data['name']}",
-                    value=f"{currency_symbol} **{balance}** {currency_type}",
+                    name=f"#{position}. {user_data['name']}",
+                    value=f"{stat_icon} **{stat_value}** {stat_type}",
                     inline=False
                 )
 
@@ -290,7 +282,7 @@ class Fetches(commands.Cog):
             scope_text = self.scope.capitalize()
 
             embed = discord.Embed(
-                title=f":fire: {scope_text} Wagering Leaderboard",
+                title=f"🔥 {scope_text} Wagering Leaderboard",
                 description=f"Top users ranked by total amount wagered",
                 color=0xFF5500
             )
@@ -299,22 +291,12 @@ class Fetches(commands.Cog):
                 # Calculate actual position on leaderboard
                 position = start_idx + i + 1
 
-                # Add medal emoji for top 3, no rank shown for others
-                if position == 1:
-                    medal = ":first_place:"
-                elif position == 2:
-                    medal = ":second_place:"
-                elif position == 3:
-                    medal = ":third_place:"
-                else:
-                    medal = ""  # No rank for positions below top 3
-
                 # Format the amount with commas
                 wagered = f"{user_data['amount']:,.2f}"
 
                 embed.add_field(
-                    name=f"{medal} {user_data['name']}",
-                    value=f":money_with_wings: **{wagered}** wagered",
+                    name=f"#{position}. {user_data['name']}",
+                    value=f"💸 **{wagered}** wagered",
                     inline=False
                 )
 
@@ -336,19 +318,23 @@ class Fetches(commands.Cog):
 
     @commands.command(aliases=["lb", "top"])
     async def leaderboard(self, ctx, arg1: str = None, arg2: str = None):
-        """View the leaderboard for tokens, credits, or wagered amount
+        """View the leaderboard for wins, losses, or wagered amount
 
         Usage: !leaderboard [scope] [type] 
         Examples: 
-        - !leaderboard global credits
-        - !leaderboard server tokens
+        - !leaderboard global wins
+        - !leaderboard server losses
         - !leaderboard wagered
         - !leaderboard server wagered
         """
+        # If no arguments are provided, show usage information
+        if arg1 is None and arg2 is None:
+            return await self.show_leaderboard_usage(ctx)
+            
         # Default values
         scope = "global"
-        leaderboard_type = "balance"
-        currency_type = "credits"
+        leaderboard_type = "stats"
+        stat_type = "wins"
 
         # Parse arguments (flexible order)
         args = [a.lower() for a in [arg1, arg2] if a]
@@ -366,10 +352,10 @@ class Fetches(commands.Cog):
             leaderboard_type = "wagered"
             args.remove("wagered")
 
-        # Remaining arg should be currency type (if balance type)
-        if args and leaderboard_type == "balance":
-            if args[0] in ["tokens", "credits"]:
-                currency_type = args[0]
+        # Remaining arg should be stat type (if stats type)
+        if args and leaderboard_type == "stats":
+            if args[0] in ["wins", "losses"]:
+                stat_type = args[0]
             else:
                 return await self.show_leaderboard_usage(ctx)
 
@@ -378,11 +364,11 @@ class Fetches(commands.Cog):
             return await ctx.reply("Server leaderboard can only be viewed in a server.")
 
         # Get the leaderboard data
-        if leaderboard_type == "balance":
+        if leaderboard_type == "stats":
             if scope == "global":
-                await self.show_global_leaderboard(ctx, currency_type)
+                await self.show_global_stats_leaderboard(ctx, stat_type)
             else:  # scope == "server"
-                await self.show_server_leaderboard(ctx, currency_type)
+                await self.show_server_stats_leaderboard(ctx, stat_type)
         else:  # leaderboard_type == "wagered"
             if scope == "global":
                 await self.show_global_wagered_leaderboard(ctx)
@@ -394,19 +380,19 @@ class Fetches(commands.Cog):
         embed = discord.Embed(
             title=":trophy: Leaderboard - Usage",
             description=(
-                "View the top users by balance or wagered amount.\n\n"
+                "View the top users by wins, losses, or wagered amount.\n\n"
                 "**Usage:** `!leaderboard [scope] [type]`\n\n"
                 "**Examples:**\n"
-                "`!leaderboard global credits` - Global credits leaderboard\n"
-                "`!leaderboard server tokens` - Server tokens leaderboard\n"
+                "`!leaderboard global wins` - Global wins leaderboard\n"
+                "`!leaderboard server losses` - Server losses leaderboard\n"
                 "`!leaderboard wagered` - Global wagering leaderboard\n"
                 "`!leaderboard server wagered` - Server wagering leaderboard\n\n"
                 "**Available Scopes:**\n"
                 "`global` - Show leaderboard across all servers\n"
                 "`server` - Show leaderboard for the current server\n\n"
                 "**Available Types:**\n"
-                "`tokens` - Show leaderboard by token balance\n"
-                "`credits` - Show leaderboard by credit balance\n"
+                "`wins` - Show leaderboard by total wins\n"
+                "`losses` - Show leaderboard by total losses\n"
                 "`wagered` - Show leaderboard by total amount wagered"
             ),
             color=0x00FFAE
@@ -414,11 +400,13 @@ class Fetches(commands.Cog):
         embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
         return await ctx.reply(embed=embed)
 
-    async def show_global_leaderboard(self, ctx, currency_type):
-        """Show global leaderboard for tokens or credits with pagination"""
+    async def show_global_stats_leaderboard(self, ctx, stat_type):
+        """Show global leaderboard for wins or losses with pagination"""
         db = Users()
-        # Get all users sorted by the specified currency
-        users = list(db.collection.find().sort([(currency_type, -1)]))
+        
+        # Get all users sorted by the specified stat
+        field_name = "total_won" if stat_type == "wins" else "total_lost"
+        users = list(db.collection.find().sort([(field_name, -1)]))
 
         if not users:
             return await ctx.reply("No users found in the leaderboard.")
@@ -426,14 +414,14 @@ class Fetches(commands.Cog):
         # Prepare data for pagination
         formatted_users = []
         for user_data in users:
-            if user_data[currency_type] > 0: #Filter out users with 0 value
+            if user_data.get(field_name, 0) > 0: # Filter out users with 0 value
                 try:
                     user = await self.bot.fetch_user(user_data["discord_id"])
                     user_name = user.name if user else f"User {user_data['discord_id']}"
 
                     formatted_users.append({
                         "name": user_name,
-                        "amount": user_data[currency_type]
+                        "amount": user_data.get(field_name, 0)
                     })
                 except Exception as e:
                     print(f"Error getting user: {e}")
@@ -443,8 +431,8 @@ class Fetches(commands.Cog):
         leaderboard_data = {
             "users": formatted_users,
             "scope": "global",
-            "type": "balance",
-            "currency": currency_type,
+            "type": "stats",
+            "stat_type": stat_type,
             "bot_avatar": self.bot.user.avatar.url
         }
 
@@ -453,8 +441,8 @@ class Fetches(commands.Cog):
         message = await ctx.reply(embed=view.get_current_page_embed(), view=view)
         view.message = message
 
-    async def show_server_leaderboard(self, ctx, currency_type):
-        """Show server leaderboard for tokens or credits with pagination"""
+    async def show_server_stats_leaderboard(self, ctx, stat_type):
+        """Show server leaderboard for wins or losses with pagination"""
         db = Users()
         server_users = []
 
@@ -470,8 +458,9 @@ class Fetches(commands.Cog):
             if user_data["discord_id"] in server_member_ids:
                 server_users.append(user_data)
 
-        # Sort the filtered users by the specified currency
-        server_users.sort(key=lambda x: x[currency_type], reverse=True)
+        # Sort the filtered users by the specified stat
+        field_name = "total_won" if stat_type == "wins" else "total_lost"
+        server_users.sort(key=lambda x: x.get(field_name, 0), reverse=True)
 
         if not server_users:
             return await ctx.reply("No users found in the server leaderboard.")
@@ -479,14 +468,14 @@ class Fetches(commands.Cog):
         # Prepare data for pagination
         formatted_users = []
         for user_data in server_users:
-            if user_data[currency_type] > 0: #Filter out users with 0 value
+            if user_data.get(field_name, 0) > 0: # Filter out users with 0 value
                 try:
                     user = await self.bot.fetch_user(user_data["discord_id"])
                     user_name = user.name if user else f"User {user_data['discord_id']}"
 
                     formatted_users.append({
                         "name": user_name,
-                        "amount": user_data[currency_type]
+                        "amount": user_data.get(field_name, 0)
                     })
                 except Exception as e:
                     print(f"Error getting user: {e}")
@@ -496,8 +485,8 @@ class Fetches(commands.Cog):
         leaderboard_data = {
             "users": formatted_users,
             "scope": "server",
-            "type": "balance",
-            "currency": currency_type,
+            "type": "stats",
+            "stat_type": stat_type,
             "bot_avatar": self.bot.user.avatar.url
         }
 
