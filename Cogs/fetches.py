@@ -251,7 +251,7 @@ class Fetches(commands.Cog):
             stat_type = self.stat_type
             scope_text = self.scope.capitalize()
             stat_icon = "🏆" if stat_type == "wins" else "❌"
-            
+
             title_text = "Wins" if stat_type == "wins" else "Losses"
 
             embed = discord.Embed(
@@ -263,10 +263,10 @@ class Fetches(commands.Cog):
             for i, user_data in enumerate(users_data):
                 # Calculate actual position on leaderboard
                 position = start_idx + i + 1
-                
+
                 # Format the amount with commas
                 stat_value = f"{user_data['amount']:,.0f}"
-                
+
                 embed.add_field(
                     name=f"#{position}. {user_data['name']}",
                     value=f"{stat_icon} **{stat_value}** {stat_type}",
@@ -330,7 +330,7 @@ class Fetches(commands.Cog):
         # If no arguments are provided, show usage information
         if arg1 is None and arg2 is None:
             return await self.show_leaderboard_usage(ctx)
-            
+
         # Default values
         scope = "global"
         leaderboard_type = "stats"
@@ -403,7 +403,7 @@ class Fetches(commands.Cog):
     async def show_global_stats_leaderboard(self, ctx, stat_type):
         """Show global leaderboard for wins or losses with pagination"""
         db = Users()
-        
+
         # Get all users sorted by the specified stat
         field_name = "total_won" if stat_type == "wins" else "total_lost"
         users = list(db.collection.find().sort([(field_name, -1)]))
@@ -421,7 +421,8 @@ class Fetches(commands.Cog):
 
                     formatted_users.append({
                         "name": user_name,
-                        "amount": user_data.get(field_name, 0)
+                        "amount": user_data.get(field_name, 0),
+                        "id": user_data["discord_id"]
                     })
                 except Exception as e:
                     print(f"Error getting user: {e}")
@@ -475,7 +476,8 @@ class Fetches(commands.Cog):
 
                     formatted_users.append({
                         "name": user_name,
-                        "amount": user_data.get(field_name, 0)
+                        "amount": user_data.get(field_name, 0),
+                        "id": user_data["discord_id"]
                     })
                 except Exception as e:
                     print(f"Error getting user: {e}")
@@ -514,7 +516,8 @@ class Fetches(commands.Cog):
 
                     formatted_users.append({
                         "name": user_name,
-                        "amount": user_data.get("total_spent", 0)
+                        "amount": user_data.get("total_spent", 0),
+                        "id": user_data["discord_id"]
                     })
                 except Exception as e:
                     print(f"Error getting user: {e}")
@@ -566,7 +569,8 @@ class Fetches(commands.Cog):
 
                     formatted_users.append({
                         "name": user_name,
-                        "amount": user_data.get("total_spent", 0)
+                        "amount": user_data.get("total_spent", 0),
+                        "id": user_data["discord_id"]
                     })
                 except Exception as e:
                     print(f"Error getting user: {e}")
