@@ -253,6 +253,7 @@ class PlinkoCog(commands.Cog):
                 "left_prob": 0.5,
                 "variance": 0.25
             }
+        }
             }
         }
 
