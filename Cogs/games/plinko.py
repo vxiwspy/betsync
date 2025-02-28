@@ -726,19 +726,25 @@ class PlinkoCog(commands.Cog):
         }
 
         # Dimensions - base size
-        base_width = 800
+        base_width = 900
         base_height = 800
 
         # Scale dimensions based on number of rows
         # More rows means we need more vertical space and potentially wider image
         scale_factor = min(1.0, 12 / max(11, rows))  # Keep full size until 11 rows, then start scaling
         
-        # For extreme modes with many multipliers, make the image wider and adjust height more aggressively
-        width_scale = 1.0 if len(multipliers) < 15 else min(1.3, len(multipliers) / 12)
-        height_scale = 1.0 if rows <= 11 else min(1.5, rows / 10)  # More aggressive height scaling for many rows
+        # For extreme modes with many multipliers, make the image wider and adjust height more moderately
+        width_scale = 1.0 if len(multipliers) < 15 else min(1.2, len(multipliers) / 13)
+        # Less aggressive height scaling to avoid elongation
+        height_scale = 1.0 if rows <= 11 else min(1.3, rows / 11)
         
+        # Calculate dimensions with a better aspect ratio
         width = int(base_width * width_scale)
-        height = int(base_height * height_scale / scale_factor)  # Increase height for more rows
+        height = int(base_height * height_scale / scale_factor)
+        
+        # Ensure the width is at least 0.9x the height to avoid vertical elongation
+        if width < height * 0.9:
+            width = int(height * 0.9)
         
         # Adjust sizes based on scale
         peg_radius = max(5, int(10 * scale_factor))  # Minimum size of 5 pixels
@@ -858,11 +864,24 @@ class PlinkoCog(commands.Cog):
             fill=ball_color
         )
 
-        # If the image is very tall, resize it back to a standard height
-        if height > 1000:
-            resize_factor = 1000 / height
-            new_width = int(width * resize_factor)
-            new_height = 1000
+        # Adjust image aspect ratio if needed to prevent compression/elongation
+        if height > 1000 or width > 1000:
+            # Calculate aspect ratio
+            aspect_ratio = width / height
+            
+            # Determine new dimensions while maintaining aspect ratio
+            if height > width:
+                new_height = min(1000, height)
+                new_width = int(new_height * aspect_ratio)
+            else:
+                new_width = min(1000, width)
+                new_height = int(new_width / aspect_ratio)
+                
+            # Ensure minimum dimensions
+            new_width = max(800, new_width)
+            new_height = max(800, new_height)
+            
+            # Resize the image
             img = img.resize((new_width, new_height), Image.LANCZOS)
 
         return img
