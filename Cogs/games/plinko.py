@@ -725,25 +725,40 @@ class PlinkoCog(commands.Cog):
             'very_low': (150, 150, 150)  # Gray for very low multipliers
         }
 
-        # Dimensions
-        width = 800
-        height = 800
-        peg_radius = 10
-        ball_radius = 15
+        # Dimensions - base size
+        base_width = 800
+        base_height = 800
+
+        # Scale dimensions based on number of rows
+        # More rows means we need more vertical space and potentially wider image
+        scale_factor = min(1.0, 12 / max(11, rows))  # Keep full size until 11 rows, then start scaling
+        
+        # For extreme modes with many multipliers, make the image wider
+        width_scale = 1.0 if len(multipliers) < 15 else min(1.2, len(multipliers) / 12)
+        
+        width = int(base_width * width_scale)
+        height = int(base_height / scale_factor)  # Increase height for more rows
+        
+        # Adjust sizes based on scale
+        peg_radius = max(5, int(10 * scale_factor))  # Minimum size of 5 pixels
+        ball_radius = max(8, int(15 * scale_factor))  # Minimum size of 8 pixels
 
         # Create a new image with dark background
         img = Image.new('RGBA', (width, height), bg_color)
         draw = ImageDraw.Draw(img)
 
         # Add the "BetSync Plinko" watermark
-        watermark_font = ImageFont.truetype("roboto.ttf", 80)
+        watermark_size = int(80 * scale_factor)
+        watermark_font = ImageFont.truetype("roboto.ttf", watermark_size)
         watermark_text = "BetSync"
-        draw.text((width//2, height//2), watermark_text, font=watermark_font, fill=(255, 255, 255, 30), anchor="mm")
-        draw.text((width//2, height//2 + 80), "Plinko", font=watermark_font, fill=(255, 255, 255, 30), anchor="mm")
+        # Always use semi-transparent white for watermark (fixes black watermark issue)
+        watermark_color = (255, 255, 255, 30)
+        draw.text((width//2, height//2), watermark_text, font=watermark_font, fill=watermark_color, anchor="mm")
+        draw.text((width//2, height//2 + watermark_size), "Plinko", font=watermark_font, fill=watermark_color, anchor="mm")
 
         # Calculate spacing based on rows
         horizontal_spacing = width / (rows + 1)
-        vertical_spacing = height / (rows + 2)  # +2 to leave room for multipliers at bottom
+        vertical_spacing = height / (rows + 3)  # +3 to leave more room for multipliers at bottom
 
         # Draw the pegs
         for row in range(rows + 1):
@@ -768,11 +783,15 @@ class PlinkoCog(commands.Cog):
 
         # Draw the landing slots (bottom row)
         slot_width = width / len(multipliers)
-        slot_height = 40
-        slot_y = vertical_spacing + rows * vertical_spacing + 30  # Below the last row of pegs
+        slot_height = 40 * scale_factor
+        slot_y = vertical_spacing + rows * vertical_spacing + 30 * scale_factor  # Below the last row of pegs
 
+        # Determine font size for multipliers based on number of slots
+        # More slots means smaller font to avoid overlap
+        multiplier_font_size = max(12, int(20 * min(1.0, 12 / len(multipliers))))
+        multiplier_font = ImageFont.truetype("roboto.ttf", multiplier_font_size)
+        
         # Draw the multipliers
-        multiplier_font = ImageFont.truetype("roboto.ttf", 20)
         for i, multiplier in enumerate(multipliers):
             # Determine color based on multiplier value
             if multiplier >= 5:
@@ -786,14 +805,20 @@ class PlinkoCog(commands.Cog):
 
             # Draw multiplier text
             x = i * slot_width + slot_width / 2
-            y = slot_y + 20
+            y = slot_y + 20 * scale_factor
             multiplier_text = f"{multiplier}x"
-            draw.text((x, y), multiplier_text, font=multiplier_font, fill=color, anchor="mm")
+            
+            # Ensure the text is readable by setting a minimum spacing between slots
+            # If slots are too close, only show every Nth multiplier
+            skip_factor = max(1, int(len(multipliers) / 15))
+            
+            if i % skip_factor == 0 or i == landing_position:
+                draw.text((x, y), multiplier_text, font=multiplier_font, fill=color, anchor="mm")
 
             # Highlight the landing slot
             if i == landing_position:
                 # Draw a rectangle around the winning multiplier
-                padding = 5
+                padding = 5 * scale_factor
                 text_bbox = draw.textbbox((x, y), multiplier_text, font=multiplier_font, anchor="mm")
                 draw.rectangle(
                     (
@@ -803,7 +828,7 @@ class PlinkoCog(commands.Cog):
                         text_bbox[3] + padding
                     ),
                     outline=ball_color,
-                    width=2
+                    width=max(1, int(2 * scale_factor))
                 )
 
         # Draw the ball at its final position
@@ -814,6 +839,13 @@ class PlinkoCog(commands.Cog):
             (ball_x - ball_radius, ball_y - ball_radius, ball_x + ball_radius, ball_y + ball_radius),
             fill=ball_color
         )
+
+        # If the image is very tall, resize it back to a standard height
+        if height > 1000:
+            resize_factor = 1000 / height
+            new_width = int(width * resize_factor)
+            new_height = 1000
+            img = img.resize((new_width, new_height), Image.LANCZOS)
 
         return img
 
