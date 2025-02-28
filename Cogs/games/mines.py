@@ -293,33 +293,33 @@ class MinesTileView(discord.ui.View):
         total_cells = self.board_size * self.board_size
         safe_cells = total_cells - self.mines_count
         revealed_count = len(self.revealed_tiles)
-        
+
         # If no tiles revealed yet, multiplier is 1.0
         if revealed_count == 0:
             self.current_multiplier = 1.0
             return
-            
+
         # Calculate proper probability-based multiplier
         # Formula: 1 / (probability of getting this far without hitting a mine)
         # For each revealed tile, we need to calculate probability of not hitting a mine
         multiplier = 1.0
-        
+
         # Loop over each tile revealed
         for i in range(revealed_count):
             # Probability of not hitting a mine for the i-th pick
             # = (safe_cells - i) / (total_cells - i)
             probability = (safe_cells - i) / (total_cells - i)
             multiplier /= probability
-            
+
         # Apply house edge (~3%)
         house_edge = 0.97
         multiplier *= house_edge
-        
+
         # Round to 2 decimal places
         self.current_multiplier = round(multiplier, 2)
-        
+
         # Ensure minimum is 1.0
-        self.current_multiplier = max(1.0, self.current_multiplier)t_multiplier
+        self.current_multiplier = max(1.0, self.current_multiplier)
 
     def create_embed(self, status="playing"):
         """Create the game embed based on current state"""
@@ -777,7 +777,7 @@ class MinesCog(commands.Cog):
         db.collection.update_one(
             {"discord_id": ctx.author.id},
             {"$inc": {"total_played": 1, "total_spent": total_bet}}
-        )
+        ))
 
         # Create game view
         game_view = MinesTileView(self, ctx, total_bet, mines_count)
