@@ -101,8 +101,11 @@ class HistoryView(discord.ui.View):
                 elif item.get("type") == "loss":
                     field_name = f"❌ Loss • {item.get('game', 'Game')} • {date_str}"
                     field_value = f"Lost **{item.get('amount', 0):,.2f} tokens**"
+                elif item.get("type") == "draw":
+                    field_name = f"🔄 Draw • {item.get('game', 'Game')} • {date_str}"
+                    field_value = f"Bet returned: **{item.get('bet', 0):,.2f}**"
                 else:
-                    field_name = f"🔄 Transaction • {date_str}"
+                    field_name = f"🔄 Bet • {date_str}"
                     field_value = f"Amount: **{item.get('amount', 0):,.2f}**"
 
                 embed.add_field(name=field_name, value=field_value, inline=False)
