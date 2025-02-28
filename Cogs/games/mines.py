@@ -777,7 +777,7 @@ class MinesCog(commands.Cog):
         db.collection.update_one(
             {"discord_id": ctx.author.id},
             {"$inc": {"total_played": 1, "total_spent": total_bet}}
-        ))
+        )
 
         # Create game view
         game_view = MinesTileView(self, ctx, total_bet, mines_count)
