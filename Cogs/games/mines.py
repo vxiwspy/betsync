@@ -805,10 +805,6 @@ class MinesCog(commands.Cog):
         await game_message.add_reaction("💰")
 
         # Inform user about timeout
-        await ctx.send(
-            "💡 **Click on the buttons to reveal tiles, and react with 💰 to cash out.** The game will timeout after 2 minutes.",
-            delete_after=10
-        )
 
 
 def setup(bot):
