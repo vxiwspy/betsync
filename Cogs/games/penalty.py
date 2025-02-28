@@ -122,12 +122,6 @@ class PenaltyCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.ongoing_games = {}
-        self.goal_image_path = "attached_assets/depositphotos_144160027-stock-illustration-soccer-goalkeeper-vector-illustration-of.png"
-        
-        # Ensure the goal image exists, if not, provide a placeholder
-        if not os.path.exists(self.goal_image_path):
-            print(f"Warning: Goal image not found at {self.goal_image_path}")
-            # We'll handle this in the generate_image method
 
     @commands.command(aliases=["pen", "pk"])
     async def penalty(self, ctx, bet_amount: str = None, currency_type: str = None):
@@ -391,7 +385,7 @@ class PenaltyCog(commands.Cog):
         )
 
     def generate_penalty_image(self):
-        """Generate an image of the penalty setup"""
+        """Generate an image of the penalty setup with custom drawn goalkeeper"""
         # Create a new image with a light blue background for the sky
         img_width, img_height = 800, 600
         image = Image.new('RGBA', (img_width, img_height), (135, 206, 250))
@@ -399,6 +393,21 @@ class PenaltyCog(commands.Cog):
         # Draw the field (green)
         draw = ImageDraw.Draw(image)
         draw.rectangle([(0, img_height//2), (img_width, img_height)], fill=(34, 139, 34))
+        
+        # Add stadium in background
+        # Draw stands
+        draw.rectangle([(0, img_height//3), (img_width, img_height//2)], fill=(100, 100, 150))
+        
+        # Draw crowd (small circles representing people)
+        for i in range(0, img_width, 15):
+            for j in range(img_height//3, img_height//2, 10):
+                if random.random() > 0.3:  # Random gaps in crowd
+                    color = (
+                        random.randint(150, 255),
+                        random.randint(150, 255),
+                        random.randint(150, 255)
+                    )
+                    draw.ellipse([(i, j), (i+8, j+8)], fill=color)
         
         # Draw the goal
         goal_width, goal_height = 500, 200
@@ -419,19 +428,39 @@ class PenaltyCog(commands.Cog):
         for y in range(goal_top + 30, goal_top + goal_height, 30):
             draw.line([(goal_left + 10, y), (goal_left + goal_width - 10, y)], fill=(200, 200, 200), width=2)
         
-        # Add a goalkeeper in the middle
-        try:
-            goalkeeper = Image.open(self.goal_image_path).convert('RGBA')
-            goalkeeper = goalkeeper.resize((100, 150), Image.LANCZOS)
-            
-            # Position goalkeeper in the middle of the goal
-            goalkeeper_pos = ((img_width - goalkeeper.width) // 2, goal_top + goal_height - goalkeeper.height - 10)
-            image.paste(goalkeeper, goalkeeper_pos, goalkeeper)
-        except Exception as e:
-            print(f"Error loading goalkeeper image: {e}")
-            # Draw a simple goalkeeper if image not available
-            draw.rectangle([(img_width//2 - 25, goal_top + 50), (img_width//2 + 25, goal_top + 150)], fill=(0, 255, 0))
-            draw.ellipse([(img_width//2 - 20, goal_top + 20), (img_width//2 + 20, goal_top + 60)], fill=(255, 200, 150))
+        # Draw a custom goalkeeper in the middle
+        goalkeeper_x = (img_width - 80) // 2
+        goalkeeper_y = goal_top + goal_height - 150
+        
+        # Draw goalkeeper body (green jersey)
+        draw.rectangle([(goalkeeper_x, goalkeeper_y + 40), (goalkeeper_x + 80, goalkeeper_y + 140)], fill=(0, 180, 0))
+        
+        # Draw goalkeeper head
+        draw.ellipse([(goalkeeper_x + 20, goalkeeper_y), (goalkeeper_x + 60, goalkeeper_y + 40)], fill=(255, 200, 150))
+        
+        # Draw goalkeeper arms (in ready position)
+        # Left arm
+        draw.line([(goalkeeper_x + 10, goalkeeper_y + 50), (goalkeeper_x - 20, goalkeeper_y + 30)], fill=(0, 180, 0), width=15)
+        # Right arm
+        draw.line([(goalkeeper_x + 70, goalkeeper_y + 50), (goalkeeper_x + 100, goalkeeper_y + 30)], fill=(0, 180, 0), width=15)
+        
+        # Draw goalkeeper hands
+        draw.ellipse([(goalkeeper_x - 30, goalkeeper_y + 20), (goalkeeper_x - 10, goalkeeper_y + 40)], fill=(255, 220, 150))
+        draw.ellipse([(goalkeeper_x + 90, goalkeeper_y + 20), (goalkeeper_x + 110, goalkeeper_y + 40)], fill=(255, 220, 150))
+        
+        # Draw goalkeeper legs
+        # Left leg
+        draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 140), (goalkeeper_x + 35, goalkeeper_y + 190)], fill=(0, 100, 0))
+        # Right leg
+        draw.rectangle([(goalkeeper_x + 45, goalkeeper_y + 140), (goalkeeper_x + 65, goalkeeper_y + 190)], fill=(0, 100, 0))
+        
+        # Draw goalkeeper face (simple eyes and mouth)
+        draw.ellipse([(goalkeeper_x + 30, goalkeeper_y + 10), (goalkeeper_x + 38, goalkeeper_y + 18)], fill=(0, 0, 0))
+        draw.ellipse([(goalkeeper_x + 42, goalkeeper_y + 10), (goalkeeper_x + 50, goalkeeper_y + 18)], fill=(0, 0, 0))
+        draw.arc([(goalkeeper_x + 30, goalkeeper_y + 20), (goalkeeper_x + 50, goalkeeper_y + 35)], 0, 180, fill=(0, 0, 0), width=2)
+        
+        # Draw a number on the goalkeeper's jersey
+        draw.text((goalkeeper_x + 40, goalkeeper_y + 90), "1", font=ImageFont.truetype("roboto.ttf", 40), fill=(255, 255, 255), anchor="mm")
         
         # Draw a ball
         ball_radius = 20
@@ -451,6 +480,12 @@ class PenaltyCog(commands.Cog):
             (ball_center[0], ball_center[1] + ball_radius)
         ], fill=(0, 0, 0), width=2)
         
+        # Draw penalty spot
+        draw.ellipse([
+            (ball_center[0] - 5, ball_center[1] - 5),
+            (ball_center[0] + 5, ball_center[1] + 5)
+        ], fill=(255, 255, 255), outline=(255, 255, 255), width=2)
+        
         # Add "BETSYNC" watermark
         watermark_font = ImageFont.truetype("roboto.ttf", 60)
         draw.text((img_width // 2, img_height - 30), "BETSYNC", font=watermark_font, fill=(0, 0, 0, 64), anchor="mm")
@@ -458,7 +493,7 @@ class PenaltyCog(commands.Cog):
         return image
 
     def generate_penalty_result_image(self, shot_direction, goalkeeper_direction, goal_scored):
-        """Generate an image showing the penalty outcome"""
+        """Generate an image showing the penalty outcome with custom drawn goalkeeper"""
         # Create a new image with a light blue background for the sky
         img_width, img_height = 800, 600
         image = Image.new('RGBA', (img_width, img_height), (135, 206, 250))
@@ -466,6 +501,23 @@ class PenaltyCog(commands.Cog):
         # Draw the field (green)
         draw = ImageDraw.Draw(image)
         draw.rectangle([(0, img_height//2), (img_width, img_height)], fill=(34, 139, 34))
+        
+        # Add stadium in background
+        # Draw stands
+        draw.rectangle([(0, img_height//3), (img_width, img_height//2)], fill=(100, 100, 150))
+        
+        # Draw crowd (small circles representing people)
+        for i in range(0, img_width, 15):
+            for j in range(img_height//3, img_height//2, 10):
+                if random.random() > 0.3:  # Random gaps in crowd
+                    # If goal scored, more people stand up (excited)
+                    y_variation = random.randint(-5, 5) if goal_scored else 0
+                    color = (
+                        random.randint(150, 255),
+                        random.randint(150, 255),
+                        random.randint(150, 255)
+                    )
+                    draw.ellipse([(i, j + y_variation), (i+8, j+8 + y_variation)], fill=color)
         
         # Draw the goal
         goal_width, goal_height = 500, 200
@@ -488,9 +540,9 @@ class PenaltyCog(commands.Cog):
         
         # Position mapper for goalkeeper
         goalkeeper_positions = {
-            "left": (goal_left + 50, goal_top + goal_height - 150 - 10),
-            "middle": ((img_width - 100) // 2, goal_top + goal_height - 150 - 10),
-            "right": (goal_left + goal_width - 150, goal_top + goal_height - 150 - 10)
+            "left": (goal_left + 50, goal_top + goal_height - 150),
+            "middle": ((img_width - 80) // 2, goal_top + goal_height - 150),
+            "right": (goal_left + goal_width - 130, goal_top + goal_height - 150)
         }
         
         # Position mapper for ball
@@ -500,24 +552,81 @@ class PenaltyCog(commands.Cog):
             "right": (goal_left + goal_width - 100, goal_top + goal_height // 2)
         }
         
-        # Add the goalkeeper in the chosen position
-        try:
-            goalkeeper = Image.open(self.goal_image_path).convert('RGBA')
-            goalkeeper = goalkeeper.resize((100, 150), Image.LANCZOS)
-            
-            # Position goalkeeper based on direction
-            goalkeeper_pos = goalkeeper_positions[goalkeeper_direction]
-            image.paste(goalkeeper, goalkeeper_pos, goalkeeper)
-        except Exception as e:
-            print(f"Error loading goalkeeper image: {e}")
-            # Draw a simple goalkeeper if image not available
-            goalkeeper_pos = goalkeeper_positions[goalkeeper_direction]
-            draw.rectangle([(goalkeeper_pos[0], goalkeeper_pos[1]), (goalkeeper_pos[0] + 50, goalkeeper_pos[1] + 100)], fill=(0, 255, 0))
-            draw.ellipse([(goalkeeper_pos[0] + 5, goalkeeper_pos[1] - 30), (goalkeeper_pos[0] + 45, goalkeeper_pos[1] + 10)], fill=(255, 200, 150))
+        # Get goalkeeper position
+        goalkeeper_x = goalkeeper_positions[goalkeeper_direction][0]
+        goalkeeper_y = goalkeeper_positions[goalkeeper_direction][1]
+        
+        # Draw goalkeeper based on direction and whether they saved it or not
+        # Body (green jersey)
+        draw.rectangle([(goalkeeper_x, goalkeeper_y + 40), (goalkeeper_x + 80, goalkeeper_y + 140)], fill=(0, 180, 0))
+        
+        # Head
+        draw.ellipse([(goalkeeper_x + 20, goalkeeper_y), (goalkeeper_x + 60, goalkeeper_y + 40)], fill=(255, 200, 150))
+        
+        # Arms position depends on goalkeeper direction
+        if goalkeeper_direction == "left":
+            # Left arm stretched
+            draw.line([(goalkeeper_x + 10, goalkeeper_y + 50), (goalkeeper_x - 40, goalkeeper_y + 70)], fill=(0, 180, 0), width=15)
+            # Right arm
+            draw.line([(goalkeeper_x + 70, goalkeeper_y + 50), (goalkeeper_x + 100, goalkeeper_y + 30)], fill=(0, 180, 0), width=15)
+            # Hands
+            draw.ellipse([(goalkeeper_x - 50, goalkeeper_y + 60), (goalkeeper_x - 30, goalkeeper_y + 80)], fill=(255, 220, 150))
+            draw.ellipse([(goalkeeper_x + 90, goalkeeper_y + 20), (goalkeeper_x + 110, goalkeeper_y + 40)], fill=(255, 220, 150))
+        elif goalkeeper_direction == "right":
+            # Left arm
+            draw.line([(goalkeeper_x + 10, goalkeeper_y + 50), (goalkeeper_x - 20, goalkeeper_y + 30)], fill=(0, 180, 0), width=15)
+            # Right arm stretched
+            draw.line([(goalkeeper_x + 70, goalkeeper_y + 50), (goalkeeper_x + 120, goalkeeper_y + 70)], fill=(0, 180, 0), width=15)
+            # Hands
+            draw.ellipse([(goalkeeper_x - 30, goalkeeper_y + 20), (goalkeeper_x - 10, goalkeeper_y + 40)], fill=(255, 220, 150))
+            draw.ellipse([(goalkeeper_x + 110, goalkeeper_y + 60), (goalkeeper_x + 130, goalkeeper_y + 80)], fill=(255, 220, 150))
+        else:  # middle
+            # Left arm up
+            draw.line([(goalkeeper_x + 10, goalkeeper_y + 50), (goalkeeper_x - 10, goalkeeper_y - 20)], fill=(0, 180, 0), width=15)
+            # Right arm up
+            draw.line([(goalkeeper_x + 70, goalkeeper_y + 50), (goalkeeper_x + 90, goalkeeper_y - 20)], fill=(0, 180, 0), width=15)
+            # Hands
+            draw.ellipse([(goalkeeper_x - 20, goalkeeper_y - 30), (goalkeeper_x, goalkeeper_y - 10)], fill=(255, 220, 150))
+            draw.ellipse([(goalkeeper_x + 80, goalkeeper_y - 30), (goalkeeper_x + 100, goalkeeper_y - 10)], fill=(255, 220, 150))
+        
+        # Legs - show diving position
+        if goalkeeper_direction == "left":
+            # Legs stretched to left
+            draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 140), (goalkeeper_x + 65, goalkeeper_y + 160)], fill=(0, 100, 0))
+            draw.rectangle([(goalkeeper_x - 20, goalkeeper_y + 160), (goalkeeper_x + 65, goalkeeper_y + 180)], fill=(0, 100, 0))
+        elif goalkeeper_direction == "right":
+            # Legs stretched to right
+            draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 140), (goalkeeper_x + 65, goalkeeper_y + 160)], fill=(0, 100, 0))
+            draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 160), (goalkeeper_x + 100, goalkeeper_y + 180)], fill=(0, 100, 0))
+        else:
+            # Standing position for middle
+            draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 140), (goalkeeper_x + 35, goalkeeper_y + 190)], fill=(0, 100, 0))
+            draw.rectangle([(goalkeeper_x + 45, goalkeeper_y + 140), (goalkeeper_x + 65, goalkeeper_y + 190)], fill=(0, 100, 0))
+        
+        # Facial expression depends on whether they saved it or not
+        if goal_scored:
+            # Sad face
+            draw.ellipse([(goalkeeper_x + 30, goalkeeper_y + 10), (goalkeeper_x + 38, goalkeeper_y + 18)], fill=(0, 0, 0))
+            draw.ellipse([(goalkeeper_x + 42, goalkeeper_y + 10), (goalkeeper_x + 50, goalkeeper_y + 18)], fill=(0, 0, 0))
+            draw.arc([(goalkeeper_x + 30, goalkeeper_y + 30), (goalkeeper_x + 50, goalkeeper_y + 15)], 180, 0, fill=(0, 0, 0), width=2)
+        else:
+            # Happy face
+            draw.ellipse([(goalkeeper_x + 30, goalkeeper_y + 10), (goalkeeper_x + 38, goalkeeper_y + 18)], fill=(0, 0, 0))
+            draw.ellipse([(goalkeeper_x + 42, goalkeeper_y + 10), (goalkeeper_x + 50, goalkeeper_y + 18)], fill=(0, 0, 0))
+            draw.arc([(goalkeeper_x + 30, goalkeeper_y + 20), (goalkeeper_x + 50, goalkeeper_y + 35)], 0, 180, fill=(0, 0, 0), width=2)
+        
+        # Draw a number on the goalkeeper's jersey
+        draw.text((goalkeeper_x + 40, goalkeeper_y + 90), "1", font=ImageFont.truetype("roboto.ttf", 40), fill=(255, 255, 255), anchor="mm")
         
         # Draw the ball at the shot position
         ball_radius = 20
         ball_center = ball_positions[shot_direction]
+        
+        # If saved, show the ball slightly deflected
+        if not goal_scored:
+            # Move ball slightly away from the goal
+            ball_center = (ball_center[0], ball_center[1] + 40)
+        
         draw.ellipse([
             (ball_center[0] - ball_radius, ball_center[1] - ball_radius),
             (ball_center[0] + ball_radius, ball_center[1] + ball_radius)
@@ -537,14 +646,42 @@ class PenaltyCog(commands.Cog):
         draw.line([
             (img_width // 2, img_height - 80),  # Starting position of the ball
             ball_center
-        ], fill=(255, 0, 0), width=2)
+        ], fill=(255, 0, 0), width=3)
         
-        # Add indicator text
-        result_font = ImageFont.truetype("roboto.ttf", 30)
+        # Add shot direction indicator
+        direction_text = f"Shot: {shot_direction.upper()}"
+        draw.text((img_width // 2, img_height - 50), direction_text, 
+                 font=ImageFont.truetype("roboto.ttf", 25), fill=(0, 0, 0), anchor="mm")
+        
+        # Add result indicator
+        result_font = ImageFont.truetype("roboto.ttf", 40)
         if goal_scored:
-            draw.text(ball_center, "GOAL!", font=result_font, fill=(0, 255, 0), anchor="mm")
+            result_text = "GOAL!"
+            text_color = (0, 255, 0)
+            # Add celebratory effects
+            for _ in range(20):
+                x = random.randint(0, img_width)
+                y = random.randint(0, img_height // 3)
+                size = random.randint(5, 15)
+                color = (
+                    random.randint(200, 255),
+                    random.randint(200, 255),
+                    random.randint(100, 200)
+                )
+                draw.ellipse([(x, y), (x + size, y + size)], fill=color)
         else:
-            draw.text(ball_center, "SAVED!", font=result_font, fill=(255, 0, 0), anchor="mm")
+            result_text = "SAVED!"
+            text_color = (255, 0, 0)
+        
+        # Create highlight behind text
+        text_width, text_height = result_font.getbbox(result_text)[2:]
+        text_pos = (img_width // 2, 50)
+        draw.rectangle([
+            (text_pos[0] - text_width//2 - 10, text_pos[1] - text_height//2 - 5),
+            (text_pos[0] + text_width//2 + 10, text_pos[1] + text_height//2 + 5)
+        ], fill=(255, 255, 255, 180))
+        
+        draw.text(text_pos, result_text, font=result_font, fill=text_color, anchor="mm")
         
         # Add "BETSYNC" watermark
         watermark_font = ImageFont.truetype("roboto.ttf", 60)
