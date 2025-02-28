@@ -1,3 +1,4 @@
+
 import discord
 import random
 import time
@@ -5,6 +6,37 @@ import asyncio
 from discord.ext import commands
 from Cogs.utils.mongo import Users, Servers
 from Cogs.utils.emojis import emoji
+
+class PlayAgainView(discord.ui.View):
+    def __init__(self, cog, ctx, bet_amount):
+        super().__init__(timeout=15)  # 15 second timeout
+        self.cog = cog
+        self.ctx = ctx
+        self.bet_amount = bet_amount
+
+    @discord.ui.button(label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄")
+    async def play_again(self, button, interaction: discord.Interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+
+        # Disable button to prevent multiple clicks
+        button.disabled = True
+        await interaction.response.edit_message(view=self)
+
+        # Start a new game with the same bet
+        await interaction.response.defer()
+        await self.cog.dicegame(self.ctx, str(self.bet_amount))
+
+    async def on_timeout(self):
+        # Disable button after timeout
+        for item in self.children:
+            item.disabled = True
+        
+        # Try to update the message if it exists
+        try:
+            await self.message.edit(view=self)
+        except:
+            pass
 
 class DiceCog(commands.Cog):
     def __init__(self, bot):
@@ -24,7 +56,7 @@ class DiceCog(commands.Cog):
                     "- You and the dealer each roll a dice (1-6)\n"
                     "- If your number is higher, you win!\n"
                     "- If there's a tie or dealer wins, you lose your bet\n"
-                    "- House edge: 16.67% (you need to roll higher, not equal)\n\n"
+                    "- House edge: 4% (you need to roll higher, not equal)\n\n"
                     "You can bet using tokens (T) or credits (C):\n"
                     "- If you have enough tokens, they will be used first\n"
                     "- If you don't have enough tokens, credits will be used\n"
@@ -208,10 +240,11 @@ class DiceCog(commands.Cog):
         await loading_message.delete()
 
         try:
-            # Create initial embed
+            # Create initial embed with rolling animation
+            rolling_dice = "<a:rollingdice:1328757546345042034>"
             initial_embed = discord.Embed(
                 title="🎲 | Dice Game",
-                description=f"{bet_description}\n\nRolling the dice...",
+                description=f"{bet_description}\n\n{rolling_dice} Rolling the dice... {rolling_dice}",
                 color=0x00FFAE
             )
             initial_embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
@@ -226,14 +259,14 @@ class DiceCog(commands.Cog):
             user_roll = random.randint(1, 6)
             dealer_roll = random.randint(1, 6)
 
-            # Determine dice emojis
+            # Use custom dice emojis
             dice_emojis = {
-                1: "1️⃣",
-                2: "2️⃣",
-                3: "3️⃣",
-                4: "4️⃣",
-                5: "5️⃣",
-                6: "6️⃣"
+                1: "<:d1:1344966667628970025>",
+                2: "<:d2:1344966647798300786>",
+                3: "<:d3:1344966630458789919>",
+                4: "<:d4:1344966603544199258>",
+                5: "<:d5:1344966572883574835>",
+                6: "<:d6:1344966538775629965>"
             }
 
             user_dice = dice_emojis.get(user_roll, "🎲")
@@ -243,7 +276,8 @@ class DiceCog(commands.Cog):
             user_won = user_roll > dealer_roll
 
             # Define the multiplier (for a win)
-            multiplier = 1.8  # House edge is ~16.67%
+            # House edge of at least 4%
+            multiplier = 1.9  # With 6 sides, fair would be 2.0, so 1.9 gives ~5% house edge
 
             # Create result embed
             if user_won:
@@ -341,26 +375,15 @@ class DiceCog(commands.Cog):
                 # Update server profit
                 servers_db.update_server_profit(ctx.guild.id, total_bet)
 
-            # Add play again button
-            play_again_view = discord.ui.View()
-            play_again_button = discord.ui.Button(
-                label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄"
-            )
-
-            async def play_again_callback(interaction):
-                if interaction.user.id != ctx.author.id:
-                    return await interaction.response.send_message("This is not your game!", ephemeral=True)
-
-                # Start a new game with the same bet
-                await interaction.response.defer()
-                await self.dicegame(ctx, str(total_bet))
-
-            play_again_button.callback = play_again_callback
-            play_again_view.add_item(play_again_button)
-
+            # Add play again button that expires after 15 seconds
+            play_again_view = PlayAgainView(self, ctx, total_bet)
+            
             # Update the message with result
             result_embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
             await message.edit(embed=result_embed, view=play_again_view)
+            
+            # Store message reference in view for timeout handling
+            play_again_view.message = message
 
         except Exception as e:
             print(f"Error in dice game: {e}")
