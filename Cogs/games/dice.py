@@ -24,7 +24,8 @@ class PlayAgainView(discord.ui.View):
         await interaction.response.edit_message(view=self)
 
         # Start a new game with the same bet
-        await interaction.response.defer()
+        # Using followup instead of defer to ensure the command triggers correctly
+        await interaction.followup.send("Starting new game...", ephemeral=True)
         await self.cog.dicegame(self.ctx, str(self.bet_amount))
 
     async def on_timeout(self):
@@ -35,8 +36,8 @@ class PlayAgainView(discord.ui.View):
         # Try to update the message if it exists
         try:
             await self.message.edit(view=self)
-        except:
-            pass
+        except Exception as e:
+            print(f"Error updating message on timeout: {e}")ass
 
 class DiceCog(commands.Cog):
     def __init__(self, bot):
