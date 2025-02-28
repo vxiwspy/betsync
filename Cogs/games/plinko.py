@@ -721,7 +721,7 @@ class PlinkoCog(commands.Cog):
             'high': (255, 50, 50),     # Red for high multipliers
             'medium': (255, 165, 0),   # Orange
             'low': (255, 255, 0),      # Yellow for low multipliers
-            'very_low': (150, 150)  # Gray for very low multipliers
+            'very_low': (150, 150, 150)  # Gray for very low multipliers
         }
 
         # Base dimensions
