@@ -459,7 +459,7 @@ class CoinflipCog(commands.Cog):
             # Create view with play again button, including the player's choice for next game
             play_again_view = PlayAgainView(self, ctx, total_bet, side)
             
-            # Update message with result
+            # Make sure to update the message with the view properly attached
             await message.edit(embed=result_embed, view=play_again_view)
             
             # Store message reference in view for timeout handling
