@@ -244,22 +244,22 @@ class PlinkoCog(commands.Cog):
         # Each list represents the multipliers from left to right
         self.multiplier_templates = {
             8: {
-                "LOW": [5, 2, 1.4, 1, 0.5, 1, 1.4, 2, 5],
-                "MEDIUM": [7, 2, 1.2, 0.8, 0.3, 0.8, 1.2, 2, 7],
-                "HIGH": [10, 3, 1.3, 0.7, 0.2, 0.7, 1.3, 3, 10],
-                "EXTREME": [15, 5, 1, 0.5, 0.1, 0.5, 1, 5, 15]
+                "LOW": [6, 2.5, 1.6, 1.2, 0.4, 1.2, 1.6, 2.5, 6],
+                "MEDIUM": [9, 3, 1.5, 0.9, 0.25, 0.9, 1.5, 3, 9],
+                "HIGH": [13, 4, 1.6, 0.8, 0.15, 0.8, 1.6, 4, 13],
+                "EXTREME": [18, 6, 1.5, 0.6, 0.08, 0.6, 1.5, 6, 18]
             },
             12: {
-                "LOW": [9, 3, 1.5, 1.3, 1.1, 0.9, 0.4, 0.9, 1.1, 1.3, 1.5, 3, 9],
-                "MEDIUM": [12, 4, 2, 1.3, 0.9, 0.6, 0.2, 0.6, 0.9, 1.3, 2, 4, 12],
-                "HIGH": [18, 6, 2, 1.2, 0.7, 0.4, 0.1, 0.4, 0.7, 1.2, 2, 6, 18],
-                "EXTREME": [30, 10, 3, 1, 0.5, 0.2, 0.05, 0.2, 0.5, 1, 3, 10, 30]
+                "LOW": [12, 4, 2, 1.5, 1.2, 0.8, 0.3, 0.8, 1.2, 1.5, 2, 4, 12],
+                "MEDIUM": [16, 5, 2.5, 1.5, 1, 0.5, 0.15, 0.5, 1, 1.5, 2.5, 5, 16],
+                "HIGH": [24, 8, 3, 1.5, 0.8, 0.3, 0.08, 0.3, 0.8, 1.5, 3, 8, 24],
+                "EXTREME": [40, 15, 5, 1.5, 0.6, 0.15, 0.03, 0.15, 0.6, 1.5, 5, 15, 40]
             },
             16: {
-                "LOW": [14, 8, 4, 2, 1.5, 1.3, 1.1, 0.9, 0.4, 0.9, 1.1, 1.3, 1.5, 2, 4, 8, 14],
-                "MEDIUM": [20, 10, 5, 2.5, 1.5, 1, 0.7, 0.5, 0.2, 0.5, 0.7, 1, 1.5, 2.5, 5, 10, 20],
-                "HIGH": [30, 15, 6, 3, 1.5, 0.8, 0.5, 0.3, 0.1, 0.3, 0.5, 0.8, 1.5, 3, 6, 15, 30],
-                "EXTREME": [50, 25, 10, 5, 2, 1, 0.5, 0.2, 0.05, 0.2, 0.5, 1, 2, 5, 10, 25, 50]
+                "LOW": [18, 10, 5, 2.5, 1.8, 1.4, 1.2, 0.8, 0.3, 0.8, 1.2, 1.4, 1.8, 2.5, 5, 10, 18],
+                "MEDIUM": [25, 12, 6, 3, 1.8, 1.2, 0.8, 0.4, 0.15, 0.4, 0.8, 1.2, 1.8, 3, 6, 12, 25],
+                "HIGH": [36, 18, 8, 4, 2, 1, 0.6, 0.25, 0.07, 0.25, 0.6, 1, 2, 4, 8, 18, 36],
+                "EXTREME": [60, 30, 12, 6, 2.5, 1.2, 0.6, 0.15, 0.02, 0.15, 0.6, 1.2, 2.5, 6, 12, 30, 60]
             }
         }
 
@@ -733,11 +733,12 @@ class PlinkoCog(commands.Cog):
         # More rows means we need more vertical space and potentially wider image
         scale_factor = min(1.0, 12 / max(11, rows))  # Keep full size until 11 rows, then start scaling
         
-        # For extreme modes with many multipliers, make the image wider
-        width_scale = 1.0 if len(multipliers) < 15 else min(1.2, len(multipliers) / 12)
+        # For extreme modes with many multipliers, make the image wider and adjust height more aggressively
+        width_scale = 1.0 if len(multipliers) < 15 else min(1.3, len(multipliers) / 12)
+        height_scale = 1.0 if rows <= 11 else min(1.5, rows / 10)  # More aggressive height scaling for many rows
         
         width = int(base_width * width_scale)
-        height = int(base_height / scale_factor)  # Increase height for more rows
+        height = int(base_height * height_scale / scale_factor)  # Increase height for more rows
         
         # Adjust sizes based on scale
         peg_radius = max(5, int(10 * scale_factor))  # Minimum size of 5 pixels
@@ -751,8 +752,8 @@ class PlinkoCog(commands.Cog):
         watermark_size = int(80 * scale_factor)
         watermark_font = ImageFont.truetype("roboto.ttf", watermark_size)
         watermark_text = "BetSync"
-        # Always use semi-transparent white for watermark (fixes black watermark issue)
-        watermark_color = (255, 255, 255, 30)
+        # Always use semi-transparent white for watermark with higher opacity for better visibility
+        watermark_color = (255, 255, 255, 40)  # Increased opacity
         draw.text((width//2, height//2), watermark_text, font=watermark_font, fill=watermark_color, anchor="mm")
         draw.text((width//2, height//2 + watermark_size), "Plinko", font=watermark_font, fill=watermark_color, anchor="mm")
 
@@ -791,12 +792,25 @@ class PlinkoCog(commands.Cog):
         multiplier_font_size = max(12, int(20 * min(1.0, 12 / len(multipliers))))
         multiplier_font = ImageFont.truetype("roboto.ttf", multiplier_font_size)
         
+        # For extreme mode with many rows, adjust text spacing and font size
+        if rows >= 11:
+            # Increase spacing between multipliers
+            y_offset = 30 * scale_factor  # Push text down more to avoid overlap
+            # More aggressive skip factor for text clarity
+            text_skip_factor = max(1, int(len(multipliers) / 12))
+            # Add outline to text for better readability
+            text_outline = True
+        else:
+            y_offset = 20 * scale_factor
+            text_skip_factor = max(1, int(len(multipliers) / 15))
+            text_outline = False
+        
         # Draw the multipliers
         for i, multiplier in enumerate(multipliers):
-            # Determine color based on multiplier value
-            if multiplier >= 5:
+            # Determine color based on multiplier value - adjusted thresholds for new higher multipliers
+            if multiplier >= 10:
                 color = multiplier_colors['high']
-            elif multiplier >= 1:
+            elif multiplier >= 1.5:
                 color = multiplier_colors['medium'] 
             elif multiplier >= 0.5:
                 color = multiplier_colors['low']
@@ -805,14 +819,18 @@ class PlinkoCog(commands.Cog):
 
             # Draw multiplier text
             x = i * slot_width + slot_width / 2
-            y = slot_y + 20 * scale_factor
+            y = slot_y + y_offset
             multiplier_text = f"{multiplier}x"
             
-            # Ensure the text is readable by setting a minimum spacing between slots
             # If slots are too close, only show every Nth multiplier
-            skip_factor = max(1, int(len(multipliers) / 15))
-            
-            if i % skip_factor == 0 or i == landing_position:
+            if i % text_skip_factor == 0 or i == landing_position:
+                # Add outline effect for better text readability in extreme mode
+                if text_outline:
+                    # Draw text outline/shadow
+                    outline_color = (0, 0, 0, 180)  # Semi-transparent black
+                    for offset_x, offset_y in [(1,1), (-1,-1), (1,-1), (-1,1)]:
+                        draw.text((x+offset_x, y+offset_y), multiplier_text, font=multiplier_font, fill=outline_color, anchor="mm")
+                
                 draw.text((x, y), multiplier_text, font=multiplier_font, fill=color, anchor="mm")
 
             # Highlight the landing slot
