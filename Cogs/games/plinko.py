@@ -729,18 +729,23 @@ class PlinkoCog(commands.Cog):
         base_width = 900
         base_height = 800
 
-        # Scale dimensions based on number of rows
-        # More rows means we need more vertical space and potentially wider image
-        scale_factor = min(1.0, 12 / max(11, rows))  # Keep full size until 11 rows, then start scaling
+        # Enhanced scaling for better readability with many rows
+        # Keep full size until 11 rows, then scale more gradually
+        scale_factor = min(1.0, 12 / max(10, rows))
         
-        # For extreme modes with many multipliers, make the image wider and adjust height more moderately
-        width_scale = 1.0 if len(multipliers) < 15 else min(1.2, len(multipliers) / 13)
+        # For extreme modes with many multipliers, make the image wider
+        width_scale = 1.0 if len(multipliers) < 13 else min(1.4, len(multipliers) / 11)
         # Less aggressive height scaling to avoid elongation
-        height_scale = 1.0 if rows <= 11 else min(1.3, rows / 11)
+        height_scale = 1.0 if rows <= 10 else min(1.4, rows / 10)
         
         # Calculate dimensions with a better aspect ratio
         width = int(base_width * width_scale)
         height = int(base_height * height_scale / scale_factor)
+        
+        # For configurations with many rows and multipliers, increase the base size
+        if rows >= 14 or len(multipliers) >= 15:
+            width = int(width * 1.15)
+            height = int(height * 1.1)
         
         # Ensure the width is at least 0.9x the height to avoid vertical elongation
         if width < height * 0.9:
@@ -793,22 +798,22 @@ class PlinkoCog(commands.Cog):
         slot_height = 40 * scale_factor
         slot_y = vertical_spacing + rows * vertical_spacing + 30 * scale_factor  # Below the last row of pegs
 
-        # Determine font size for multipliers - increased sizes for better readability
-        # More slots means smaller font to avoid overlap, but maintain minimum larger size
-        multiplier_font_size = max(16, int(24 * min(1.0, 12 / len(multipliers))))
+        # Determine font size for multipliers - even larger sizes for better readability
+        # More slots means smaller font to avoid overlap, but maintain larger minimum size
+        multiplier_font_size = max(20, int(28 * min(1.0, 12 / len(multipliers))))
         multiplier_font = ImageFont.truetype("roboto.ttf", multiplier_font_size)
         
         # For extreme mode with many rows, adjust text spacing and font size
         if rows >= 11:
             # Increase spacing between multipliers
-            y_offset = 35 * scale_factor  # Push text down more to avoid overlap
+            y_offset = 40 * scale_factor  # Push text down more to avoid overlap
             # More aggressive skip factor for text clarity
-            text_skip_factor = max(1, int(len(multipliers) / 11))
+            text_skip_factor = max(1, int(len(multipliers) / 10))
             # Always add outline to text for better readability
             text_outline = True
         else:
-            y_offset = 25 * scale_factor
-            text_skip_factor = max(1, int(len(multipliers) / 14))
+            y_offset = 30 * scale_factor
+            text_skip_factor = max(1, int(len(multipliers) / 12))
             text_outline = True  # Always use text outline for better readability
         
         # Draw the multipliers
@@ -833,18 +838,39 @@ class PlinkoCog(commands.Cog):
                 # Add outline effect for better text readability in extreme mode
                 if text_outline:
                     # Draw stronger text outline for better readability
-                    outline_color = (0, 0, 0, 200)  # More opaque black
-                    # More outline positions for a stronger effect
+                    outline_color = (0, 0, 0, 255)  # Fully opaque black for stronger contrast
+                    # First draw a thicker black background for better visibility
+                    for offset_x, offset_y in [(2,2), (-2,-2), (2,-2), (-2,2), (0,2), (2,0), (-2,0), (0,-2), 
+                                              (1,2), (-1,2), (2,1), (2,-1), (-2,1), (-2,-1), (1,-2), (-1,-2)]:
+                        draw.text((x+offset_x, y+offset_y), multiplier_text, font=multiplier_font, fill=outline_color, anchor="mm")
+                    
+                    # Then draw closer outline for sharpness
                     for offset_x, offset_y in [(1,1), (-1,-1), (1,-1), (-1,1), (0,1), (1,0), (-1,0), (0,-1)]:
                         draw.text((x+offset_x, y+offset_y), multiplier_text, font=multiplier_font, fill=outline_color, anchor="mm")
                 
-                draw.text((x, y), multiplier_text, font=multiplier_font, fill=color, anchor="mm")
+                # Draw the actual text with slightly increased brightness for better visibility
+                bright_color = tuple(min(255, c + 30) for c in color[:3]) + (color[3:] if len(color) > 3 else ())
+                draw.text((x, y), multiplier_text, font=multiplier_font, fill=bright_color, anchor="mm")
 
             # Highlight the landing slot
             if i == landing_position:
-                # Draw a rectangle around the winning multiplier
-                padding = 5 * scale_factor
+                # Draw a more visible rectangle around the winning multiplier
+                padding = 8 * scale_factor
                 text_bbox = draw.textbbox((x, y), multiplier_text, font=multiplier_font, anchor="mm")
+                
+                # Draw a filled background rectangle first for better contrast
+                draw.rectangle(
+                    (
+                        text_bbox[0] - padding,
+                        text_bbox[1] - padding,
+                        text_bbox[2] + padding,
+                        text_bbox[3] + padding
+                    ),
+                    fill=(0, 0, 0, 150),  # Semi-transparent black background
+                    outline=None
+                )
+                
+                # Then draw the highlight border with increased thickness
                 draw.rectangle(
                     (
                         text_bbox[0] - padding,
@@ -853,7 +879,7 @@ class PlinkoCog(commands.Cog):
                         text_bbox[3] + padding
                     ),
                     outline=ball_color,
-                    width=max(1, int(2 * scale_factor))
+                    width=max(2, int(3 * scale_factor))
                 )
 
         # Draw the ball at its final position
