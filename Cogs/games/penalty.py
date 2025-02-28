@@ -386,7 +386,7 @@ class PenaltyCog(commands.Cog):
         )
 
     def generate_penalty_image(self):
-        """Generate an image of the penalty setup with custom drawn goalkeeper"""
+        """Generate an image of the penalty setup with a simple shape for goalkeeper"""
         try:
             # Create a new image with a light blue background for the sky
             img_width, img_height = 800, 600
@@ -430,109 +430,125 @@ class PenaltyCog(commands.Cog):
             for y in range(goal_top + 30, goal_top + goal_height, 30):
                 draw.line([(goal_left + 10, y), (goal_left + goal_width - 10, y)], fill=(200, 200, 200), width=2)
             
-            # Draw a custom goalkeeper in the middle
+            # Draw a simple shape for goalkeeper in the middle
             goalkeeper_x = (img_width - 80) // 2
             goalkeeper_y = goal_top + goal_height - 150
             
-            # Draw goalkeeper legs first (so they appear behind the body)
-            # Left leg
-            draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 140), (goalkeeper_x + 35, goalkeeper_y + 190)], fill=(0, 100, 0))
-            # Right leg
-            draw.rectangle([(goalkeeper_x + 45, goalkeeper_y + 140), (goalkeeper_x + 65, goalkeeper_y + 190)], fill=(0, 100, 0))
+            # Draw goalkeeper as a single green rectangle with extended arms
+            gk_width, gk_height = 80, 120
             
-            # Draw goalkeeper shorts
-            draw.rectangle([(goalkeeper_x + 10, goalkeeper_y + 110), (goalkeeper_x + 70, goalkeeper_y + 145)], fill=(0, 120, 0))
+            # Main body rectangle
+            draw.rectangle([
+                (goalkeeper_x, goalkeeper_y), 
+                (goalkeeper_x + gk_width, goalkeeper_y + gk_height)
+            ], fill=(0, 180, 0), outline=(0, 100, 0), width=2)
             
-            # Draw goalkeeper body (green jersey)
-            # Torso
-            draw.rectangle([(goalkeeper_x, goalkeeper_y + 40), (goalkeeper_x + 80, goalkeeper_y + 110)], fill=(0, 180, 0))
+            # Arms (horizontal rectangles extending from body)
+            arm_height = 20
+            # Left arm
+            draw.rectangle([
+                (goalkeeper_x - 40, goalkeeper_y + 40),
+                (goalkeeper_x, goalkeeper_y + 40 + arm_height)
+            ], fill=(0, 180, 0), outline=(0, 100, 0), width=2)
             
-            # Add jersey details - stripe across chest
-            draw.line([(goalkeeper_x, goalkeeper_y + 60), (goalkeeper_x + 80, goalkeeper_y + 60)], fill=(255, 255, 255), width=4)
+            # Right arm
+            draw.rectangle([
+                (goalkeeper_x + gk_width, goalkeeper_y + 40),
+                (goalkeeper_x + gk_width + 40, goalkeeper_y + 40 + arm_height)
+            ], fill=(0, 180, 0), outline=(0, 100, 0), width=2)
             
-            # Draw goalkeeper head with better shape
-            draw.ellipse([(goalkeeper_x + 25, goalkeeper_y), (goalkeeper_x + 55, goalkeeper_y + 40)], fill=(255, 200, 150))
+            # Add "GK" text to identify goalkeeper
+            gk_font = ImageFont.truetype("roboto.ttf", 36)
+            draw.text(
+                (goalkeeper_x + gk_width // 2, goalkeeper_y + gk_height // 2), 
+                "GK", 
+                font=gk_font, 
+                fill=(255, 255, 255),
+                anchor="mm"
+            )
             
-            # Draw goalkeeper hair
-            draw.rectangle([(goalkeeper_x + 25, goalkeeper_y - 5), (goalkeeper_x + 55, goalkeeper_y + 5)], fill=(50, 50, 50))
-            
-            # Draw goalkeeper arms (in ready position)
-            # Left arm - shoulder to elbow
-            draw.line([(goalkeeper_x + 10, goalkeeper_y + 50), (goalkeeper_x - 10, goalkeeper_y + 40)], fill=(0, 180, 0), width=12)
-            # Left arm - elbow to wrist
-            draw.line([(goalkeeper_x - 10, goalkeeper_y + 40), (goalkeeper_x - 25, goalkeeper_y + 35)], fill=(0, 180, 0), width=10)
-            
-            # Right arm - shoulder to elbow
-            draw.line([(goalkeeper_x + 70, goalkeeper_y + 50), (goalkeeper_x + 90, goalkeeper_y + 40)], fill=(0, 180, 0), width=12)
-            # Right arm - elbow to wrist
-            draw.line([(goalkeeper_x + 90, goalkeeper_y + 40), (goalkeeper_x + 105, goalkeeper_y + 35)], fill=(0, 180, 0), width=10)
-            
-            # Draw goalkeeper gloves (bigger and more detailed)
-            # Left glove
-            draw.rectangle([(goalkeeper_x - 40, goalkeeper_y + 25), (goalkeeper_x - 15, goalkeeper_y + 45)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
-            # Right glove
-            draw.rectangle([(goalkeeper_x + 95, goalkeeper_y + 25), (goalkeeper_x + 120, goalkeeper_y + 45)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
-            
-            # Draw goalkeeper face with better features (simple eyes, nose, and mouth)
-            # Eyes
-            draw.ellipse([(goalkeeper_x + 33, goalkeeper_y + 12), (goalkeeper_x + 38, goalkeeper_y + 18)], fill=(30, 30, 80))
-            draw.ellipse([(goalkeeper_x + 42, goalkeeper_y + 12), (goalkeeper_x + 47, goalkeeper_y + 18)], fill=(30, 30, 80))
-            
-            # Eyebrows
-            draw.line([(goalkeeper_x + 32, goalkeeper_y + 10), (goalkeeper_x + 39, goalkeeper_y + 8)], fill=(50, 50, 50), width=2)
-            draw.line([(goalkeeper_x + 41, goalkeeper_y + 8), (goalkeeper_x + 48, goalkeeper_y + 10)], fill=(50, 50, 50), width=2)
-            
-            # Nose
-            draw.line([(goalkeeper_x + 40, goalkeeper_y + 18), (goalkeeper_x + 40, goalkeeper_y + 25)], fill=(200, 150, 100), width=2)
-            
-            # Mouth - determined expression
-            draw.line([(goalkeeper_x + 33, goalkeeper_y + 30), (goalkeeper_x + 47, goalkeeper_y + 30)], fill=(150, 50, 50), width=2)
-            
-            # Draw a number on the goalkeeper's jersey
-            draw.text((goalkeeper_x + 40, goalkeeper_y + 85), "1", font=ImageFont.truetype("roboto.ttf", 30), fill=(255, 255, 255))
-            
-            # Add some goalkeeper knee pads
-            draw.ellipse([(goalkeeper_x + 15, goalkeeper_y + 140), (goalkeeper_x + 35, goalkeeper_y + 160)], fill=(255, 255, 255))
-            draw.ellipse([(goalkeeper_x + 45, goalkeeper_y + 140), (goalkeeper_x + 65, goalkeeper_y + 160)], fill=(255, 255, 255))
-            
-            # Draw a ball
+            # Draw a more realistic ball
             ball_radius = 20
             ball_center = (img_width // 2, img_height - 80)
+            
+            # White base of the ball
             draw.ellipse([
                 (ball_center[0] - ball_radius, ball_center[1] - ball_radius),
                 (ball_center[0] + ball_radius, ball_center[1] + ball_radius)
-            ], fill=(255, 255, 255))
+            ], fill=(255, 255, 255), outline=(220, 220, 220), width=1)
             
-            # Add better details to the ball
-            # Black pentagon pattern
-            pentagon_radius = ball_radius * 0.7
-            for i in range(5):
-                angle = i * (2 * 3.14159 / 5)
-                x = ball_center[0] + pentagon_radius * 0.8 * math.cos(angle)
-                y = ball_center[1] + pentagon_radius * 0.8 * math.sin(angle)
+            # Draw the classic soccer ball pattern
+            # Hexagons and pentagons
+            pentagon_points = []
+            hexagon_points = []
+            
+            # Create pattern of alternating pentagons and hexagons
+            for i in range(8):
+                angle = i * (2 * math.pi / 8)
+                radius_factor = 0.7 if i % 2 == 0 else 0.85
+                x = ball_center[0] + ball_radius * radius_factor * math.cos(angle)
+                y = ball_center[1] + ball_radius * radius_factor * math.sin(angle)
                 
-                # Draw small pentagon at each point
-                draw.regular_polygon((x, y, 5), 5, rotation=0, fill=(0, 0, 0))
+                if i % 2 == 0:
+                    # Pentagon (black)
+                    try:
+                        draw.regular_polygon((x, y, 5), 5, rotation=0, fill=(0, 0, 0))
+                    except AttributeError:
+                        # Fallback if regular_polygon not available
+                        draw.ellipse([(x-4, y-4), (x+4, y+4)], fill=(0, 0, 0))
+                else:
+                    # Hexagon (using small black circles as approximation)
+                    draw.ellipse([(x-3, y-3), (x+3, y+3)], fill=(0, 0, 0))
             
-            # Add main seams
+            # Add seam lines to make it look more like a soccer ball
+            # Horizontal seam
+            draw.arc([
+                (ball_center[0] - ball_radius, ball_center[1] - ball_radius),
+                (ball_center[0] + ball_radius, ball_center[1] + ball_radius)
+            ], 0, 180, fill=(0, 0, 0), width=1)
+            
+            # Vertical seam
+            draw.arc([
+                (ball_center[0] - ball_radius, ball_center[1] - ball_radius),
+                (ball_center[0] + ball_radius, ball_center[1] + ball_radius)
+            ], 270, 90, fill=(0, 0, 0), width=1)
+            
+            # Diagonal seams
             draw.line([
-                (ball_center[0] - ball_radius, ball_center[1]),
-                (ball_center[0] + ball_radius, ball_center[1])
-            ], fill=(0, 0, 0), width=2)
+                (ball_center[0] - ball_radius * 0.7, ball_center[1] - ball_radius * 0.7),
+                (ball_center[0] + ball_radius * 0.7, ball_center[1] + ball_radius * 0.7)
+            ], fill=(0, 0, 0), width=1)
+            
             draw.line([
-                (ball_center[0], ball_center[1] - ball_radius),
-                (ball_center[0], ball_center[1] + ball_radius)
-            ], fill=(0, 0, 0), width=2)
+                (ball_center[0] - ball_radius * 0.7, ball_center[1] + ball_radius * 0.7),
+                (ball_center[0] + ball_radius * 0.7, ball_center[1] - ball_radius * 0.7)
+            ], fill=(0, 0, 0), width=1)
+            
+            # Add highlight to make the ball look 3D
+            highlight_radius = ball_radius * 0.3
+            highlight_offset = ball_radius * 0.4
+            draw.ellipse([
+                (ball_center[0] - highlight_radius - highlight_offset, 
+                 ball_center[1] - highlight_radius - highlight_offset),
+                (ball_center[0] + highlight_radius - highlight_offset, 
+                 ball_center[1] + highlight_radius - highlight_offset)
+            ], fill=(255, 255, 255, 180))
             
             # Draw penalty spot
             draw.ellipse([
-                (ball_center[0] - 5, ball_center[1] - 5),
-                (ball_center[0] + 5, ball_center[1] + 5)
+                (ball_center[0] - 5, ball_center[1] + ball_radius + 5),
+                (ball_center[0] + 5, ball_center[1] + ball_radius + 15)
             ], fill=(255, 255, 255), outline=(255, 255, 255), width=2)
             
-            # Add "BETSYNC" watermark
-            watermark_font = ImageFont.truetype("roboto.ttf", 60)
-            draw.text((img_width // 2, img_height - 30), "BETSYNC", font=watermark_font, fill=(0, 0, 0, 64), anchor="mm")
+            # Add "BETSYNC" watermark at the top with transparency
+            watermark_font = ImageFont.truetype("roboto.ttf", 50)
+            draw.text(
+                (img_width // 2, 40), 
+                "BETSYNC", 
+                font=watermark_font, 
+                fill=(0, 0, 0, 64),  # More transparent
+                anchor="mm"
+            )
             
             return image
         except Exception as e:
@@ -573,7 +589,7 @@ class PenaltyCog(commands.Cog):
             return fallback_image
 
     def generate_penalty_result_image(self, shot_direction, goalkeeper_direction, goal_scored):
-        """Generate an image showing the penalty outcome with custom drawn goalkeeper"""
+        """Generate an image showing the penalty outcome with simplified goalkeeper"""
         try:
             # Create a new image with a light blue background for the sky
             img_width, img_height = 800, 600
@@ -621,9 +637,9 @@ class PenaltyCog(commands.Cog):
             
             # Position mapper for goalkeeper
             goalkeeper_positions = {
-                "left": (goal_left + 50, goal_top + goal_height - 150),
+                "left": (goal_left + 80, goal_top + goal_height - 150),
                 "middle": ((img_width - 80) // 2, goal_top + goal_height - 150),
-                "right": (goal_left + goal_width - 130, goal_top + goal_height - 150)
+                "right": (goal_left + goal_width - 160, goal_top + goal_height - 150)
             }
             
             # Position mapper for ball
@@ -637,127 +653,98 @@ class PenaltyCog(commands.Cog):
             goalkeeper_x = goalkeeper_positions[goalkeeper_direction][0]
             goalkeeper_y = goalkeeper_positions[goalkeeper_direction][1]
             
-            # Calculate dive angle for rotating the goalkeeper
-            dive_angle = 0
+            # Draw goalkeeper as a single shape based on direction
+            gk_width, gk_height = 80, 120
+            
+            # Draw the goalkeeper in different positions based on direction
             if goalkeeper_direction == "left":
-                dive_angle = 30
+                # Goalkeeper diving to the left
+                # Main rectangle body rotated/stretched to left
+                points = [
+                    (goalkeeper_x, goalkeeper_y + 30),  # Top left
+                    (goalkeeper_x + gk_width * 0.8, goalkeeper_y),  # Top right
+                    (goalkeeper_x + gk_width, goalkeeper_y + gk_height * 0.8),  # Bottom right
+                    (goalkeeper_x - 40, goalkeeper_y + gk_height)   # Bottom left (extended for dive)
+                ]
+                draw.polygon(points, fill=(0, 180, 0), outline=(0, 100, 0), width=2)
+                
+                # Add motion lines to show diving
+                for i in range(3):
+                    offset = i * 10
+                    draw.line([
+                        (goalkeeper_x + gk_width + offset, goalkeeper_y + 30), 
+                        (goalkeeper_x + gk_width + 20 + offset, goalkeeper_y + 30)
+                    ], fill=(50, 50, 50, 150), width=2)
+                
             elif goalkeeper_direction == "right":
-                dive_angle = -30
-            
-            # Draw goalkeeper based on direction and whether they saved it or not
-            # Draw legs first based on direction
-            if goalkeeper_direction == "left":
-                # Legs stretched to left for diving
-                draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 140), (goalkeeper_x + 65, goalkeeper_y + 160)], fill=(0, 100, 0))
-                draw.rectangle([(goalkeeper_x - 20, goalkeeper_y + 160), (goalkeeper_x + 65, goalkeeper_y + 180)], fill=(0, 100, 0))
+                # Goalkeeper diving to the right
+                # Main rectangle body rotated/stretched to right
+                points = [
+                    (goalkeeper_x + gk_width * 0.2, goalkeeper_y),  # Top left
+                    (goalkeeper_x + gk_width, goalkeeper_y + 30),  # Top right
+                    (goalkeeper_x + gk_width + 40, goalkeeper_y + gk_height),  # Bottom right (extended for dive)
+                    (goalkeeper_x, goalkeeper_y + gk_height * 0.8)   # Bottom left
+                ]
+                draw.polygon(points, fill=(0, 180, 0), outline=(0, 100, 0), width=2)
                 
-                # Add knee pads
-                draw.ellipse([(goalkeeper_x + 15, goalkeeper_y + 145), (goalkeeper_x + 35, goalkeeper_y + 165)], fill=(255, 255, 255))
-            elif goalkeeper_direction == "right":
-                # Legs stretched to right for diving
-                draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 140), (goalkeeper_x + 65, goalkeeper_y + 160)], fill=(0, 100, 0))
-                draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 160), (goalkeeper_x + 100, goalkeeper_y + 180)], fill=(0, 100, 0))
+                # Add motion lines to show diving
+                for i in range(3):
+                    offset = i * 10
+                    draw.line([
+                        (goalkeeper_x - offset, goalkeeper_y + 30), 
+                        (goalkeeper_x - 20 - offset, goalkeeper_y + 30)
+                    ], fill=(50, 50, 50, 150), width=2)
                 
-                # Add knee pads
-                draw.ellipse([(goalkeeper_x + 45, goalkeeper_y + 145), (goalkeeper_x + 65, goalkeeper_y + 165)], fill=(255, 255, 255))
-            else:
-                # Jumping position for middle
-                draw.rectangle([(goalkeeper_x + 15, goalkeeper_y + 140), (goalkeeper_x + 35, goalkeeper_y + 180)], fill=(0, 100, 0))
-                draw.rectangle([(goalkeeper_x + 45, goalkeeper_y + 140), (goalkeeper_x + 65, goalkeeper_y + 180)], fill=(0, 100, 0))
-                
-                # Add knee pads
-                draw.ellipse([(goalkeeper_x + 15, goalkeeper_y + 155), (goalkeeper_x + 35, goalkeeper_y + 175)], fill=(255, 255, 255))
-                draw.ellipse([(goalkeeper_x + 45, goalkeeper_y + 155), (goalkeeper_x + 65, goalkeeper_y + 175)], fill=(255, 255, 255))
-            
-            # Add shorts
-            draw.rectangle([(goalkeeper_x + 10, goalkeeper_y + 110), (goalkeeper_x + 70, goalkeeper_y + 145)], fill=(0, 120, 0))
-            
-            # Body (green jersey)
-            draw.rectangle([(goalkeeper_x, goalkeeper_y + 40), (goalkeeper_x + 80, goalkeeper_y + 110)], fill=(0, 180, 0))
-            
-            # Add jersey details - stripe across chest
-            draw.line([(goalkeeper_x, goalkeeper_y + 60), (goalkeeper_x + 80, goalkeeper_y + 60)], fill=(255, 255, 255), width=4)
-            
-            # Head
-            draw.ellipse([(goalkeeper_x + 25, goalkeeper_y), (goalkeeper_x + 55, goalkeeper_y + 40)], fill=(255, 200, 150))
-            
-            # Draw hair
-            draw.rectangle([(goalkeeper_x + 25, goalkeeper_y - 5), (goalkeeper_x + 55, goalkeeper_y + 5)], fill=(50, 50, 50))
-            
-            # Arms position depends on goalkeeper direction
-            if goalkeeper_direction == "left":
-                # Left arm stretched for dive
-                draw.line([(goalkeeper_x + 10, goalkeeper_y + 50), (goalkeeper_x - 30, goalkeeper_y + 60)], fill=(0, 180, 0), width=12)
-                draw.line([(goalkeeper_x - 30, goalkeeper_y + 60), (goalkeeper_x - 50, goalkeeper_y + 70)], fill=(0, 180, 0), width=10)
-                
-                # Right arm back to balance
-                draw.line([(goalkeeper_x + 70, goalkeeper_y + 50), (goalkeeper_x + 90, goalkeeper_y + 20)], fill=(0, 180, 0), width=12)
-                
-                # Gloves
-                draw.rectangle([(goalkeeper_x - 65, goalkeeper_y + 60), (goalkeeper_x - 40, goalkeeper_y + 80)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
-                draw.rectangle([(goalkeeper_x + 80, goalkeeper_y + 10), (goalkeeper_x + 105, goalkeeper_y + 30)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
-            elif goalkeeper_direction == "right":
-                # Left arm back to balance
-                draw.line([(goalkeeper_x + 10, goalkeeper_y + 50), (goalkeeper_x - 10, goalkeeper_y + 20)], fill=(0, 180, 0), width=12)
-                
-                # Right arm stretched for dive
-                draw.line([(goalkeeper_x + 70, goalkeeper_y + 50), (goalkeeper_x + 110, goalkeeper_y + 60)], fill=(0, 180, 0), width=12)
-                draw.line([(goalkeeper_x + 110, goalkeeper_y + 60), (goalkeeper_x + 130, goalkeeper_y + 70)], fill=(0, 180, 0), width=10)
-                
-                # Gloves
-                draw.rectangle([(goalkeeper_x - 25, goalkeeper_y + 10), (goalkeeper_x, goalkeeper_y + 30)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
-                draw.rectangle([(goalkeeper_x + 120, goalkeeper_y + 60), (goalkeeper_x + 145, goalkeeper_y + 80)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
             else:  # middle
-                # Both arms up for jump
-                draw.line([(goalkeeper_x + 10, goalkeeper_y + 50), (goalkeeper_x - 10, goalkeeper_y - 10)], fill=(0, 180, 0), width=12)
-                draw.line([(goalkeeper_x + 70, goalkeeper_y + 50), (goalkeeper_x + 90, goalkeeper_y - 10)], fill=(0, 180, 0), width=12)
+                # Goalkeeper jumping up for middle save
+                # Main rectangle body
+                points = [
+                    (goalkeeper_x, goalkeeper_y - 20),  # Top left (higher for jump)
+                    (goalkeeper_x + gk_width, goalkeeper_y - 20),  # Top right (higher for jump)
+                    (goalkeeper_x + gk_width, goalkeeper_y + gk_height - 20),  # Bottom right
+                    (goalkeeper_x, goalkeeper_y + gk_height - 20)   # Bottom left
+                ]
+                draw.polygon(points, fill=(0, 180, 0), outline=(0, 100, 0), width=2)
                 
-                # Gloves
-                draw.rectangle([(goalkeeper_x - 25, goalkeeper_y - 30), (goalkeeper_x, goalkeeper_y - 5)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
-                draw.rectangle([(goalkeeper_x + 80, goalkeeper_y - 30), (goalkeeper_x + 105, goalkeeper_y - 5)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
-            
-            # Facial expression depends on whether they saved it or not
-            if goal_scored:
-                # Sad face
-                draw.ellipse([(goalkeeper_x + 33, goalkeeper_y + 12), (goalkeeper_x + 38, goalkeeper_y + 18)], fill=(30, 30, 80))
-                draw.ellipse([(goalkeeper_x + 42, goalkeeper_y + 12), (goalkeeper_x + 47, goalkeeper_y + 18)], fill=(30, 30, 80))
-                draw.arc([(goalkeeper_x + 33, goalkeeper_y + 30), (goalkeeper_x + 47, goalkeeper_y + 20)], 180, 0, fill=(0, 0, 0), width=2)
+                # Add arms extended upward
+                draw.rectangle([
+                    (goalkeeper_x - 30, goalkeeper_y - 30),
+                    (goalkeeper_x, goalkeeper_y)
+                ], fill=(0, 180, 0), outline=(0, 100, 0), width=2)
                 
-                # Sad eyebrows
-                draw.line([(goalkeeper_x + 32, goalkeeper_y + 8), (goalkeeper_x + 39, goalkeeper_y + 10)], fill=(50, 50, 50), width=2)
-                draw.line([(goalkeeper_x + 41, goalkeeper_y + 10), (goalkeeper_x + 48, goalkeeper_y + 8)], fill=(50, 50, 50), width=2)
-            else:
-                # Happy face with determined expression
-                draw.ellipse([(goalkeeper_x + 33, goalkeeper_y + 12), (goalkeeper_x + 38, goalkeeper_y + 18)], fill=(30, 30, 80))
-                draw.ellipse([(goalkeeper_x + 42, goalkeeper_y + 12), (goalkeeper_x + 47, goalkeeper_y + 18)], fill=(30, 30, 80))
-                draw.arc([(goalkeeper_x + 33, goalkeeper_y + 23), (goalkeeper_x + 47, goalkeeper_y + 33)], 0, 180, fill=(0, 0, 0), width=2)
+                draw.rectangle([
+                    (goalkeeper_x + gk_width, goalkeeper_y - 30),
+                    (goalkeeper_x + gk_width + 30, goalkeeper_y)
+                ], fill=(0, 180, 0), outline=(0, 100, 0), width=2)
                 
-                # Determined eyebrows
-                draw.line([(goalkeeper_x + 32, goalkeeper_y + 10), (goalkeeper_x + 39, goalkeeper_y + 8)], fill=(50, 50, 50), width=2)
-                draw.line([(goalkeeper_x + 41, goalkeeper_y + 8), (goalkeeper_x + 48, goalkeeper_y + 10)], fill=(50, 50, 50), width=2)
+                # Add motion lines for jump
+                for i in range(3):
+                    offset = i * 10
+                    draw.line([
+                        (goalkeeper_x + gk_width//2, goalkeeper_y + gk_height + offset), 
+                        (goalkeeper_x + gk_width//2, goalkeeper_y + gk_height + 20 + offset)
+                    ], fill=(50, 50, 50, 150), width=2)
             
-            # Add nose
-            draw.line([(goalkeeper_x + 40, goalkeeper_y + 18), (goalkeeper_x + 40, goalkeeper_y + 25)], fill=(200, 150, 100), width=2)
+            # Add "GK" text
+            gk_font = ImageFont.truetype("roboto.ttf", 36)
+            gk_text_x = goalkeeper_x + gk_width // 2
+            gk_text_y = goalkeeper_y + gk_height // 2
             
-            # Draw a number on the goalkeeper's jersey
-            draw.text((goalkeeper_x + 40, goalkeeper_y + 85), "1", font=ImageFont.truetype("roboto.ttf", 30), fill=(255, 255, 255))
-            
-            # Add motion lines based on the goalkeeper's direction
+            # Adjust text position based on dive direction
             if goalkeeper_direction == "left":
-                for i in range(3):
-                    offset = i * 10
-                    draw.line([(goalkeeper_x + 80 + offset, goalkeeper_y + 50), (goalkeeper_x + 100 + offset, goalkeeper_y + 50)], 
-                              fill=(50, 50, 50, 150), width=2)
+                gk_text_x -= 20
             elif goalkeeper_direction == "right":
-                for i in range(3):
-                    offset = i * 10
-                    draw.line([(goalkeeper_x - offset, goalkeeper_y + 50), (goalkeeper_x - 20 - offset, goalkeeper_y + 50)], 
-                              fill=(50, 50, 50, 150), width=2)
-            else:  # middle - vertical motion lines
-                for i in range(3):
-                    offset = i * 10
-                    draw.line([(goalkeeper_x + 40, goalkeeper_y + 190 + offset), (goalkeeper_x + 40, goalkeeper_y + 210 + offset)], 
-                              fill=(50, 50, 50, 150), width=2)
+                gk_text_x += 20
+            elif goalkeeper_direction == "middle":
+                gk_text_y -= 10
+                
+            draw.text(
+                (gk_text_x, gk_text_y), 
+                "GK", 
+                font=gk_font, 
+                fill=(255, 255, 255),
+                anchor="mm"
+            )
             
             # Draw the ball at the shot position
             ball_radius = 20
@@ -773,32 +760,85 @@ class PenaltyCog(commands.Cog):
                 else:
                     ball_center = (ball_center[0], ball_center[1] + 40)
             
+            # Draw the white base of the ball
             draw.ellipse([
                 (ball_center[0] - ball_radius, ball_center[1] - ball_radius),
                 (ball_center[0] + ball_radius, ball_center[1] + ball_radius)
-            ], fill=(255, 255, 255))
+            ], fill=(255, 255, 255), outline=(220, 220, 220), width=1)
             
-            # Add better details to the ball
-            # Black pentagon pattern
-            try:
-                pentagon_radius = ball_radius * 0.7
-                for i in range(5):
-                    angle = i * (2 * 3.14159 / 5)
-                    x = ball_center[0] + pentagon_radius * 0.8 * math.cos(angle)
-                    y = ball_center[1] + pentagon_radius * 0.8 * math.sin(angle)
-                    
-                    # Draw small pentagon at each point
-                    draw.regular_polygon((x, y, 5), 5, rotation=0, fill=(0, 0, 0))
-            except AttributeError:
-                # Fallback if regular_polygon not available
-                draw.line([
-                    (ball_center[0] - ball_radius, ball_center[1]),
-                    (ball_center[0] + ball_radius, ball_center[1])
-                ], fill=(0, 0, 0), width=2)
-                draw.line([
-                    (ball_center[0], ball_center[1] - ball_radius),
-                    (ball_center[0], ball_center[1] + ball_radius)
-                ], fill=(0, 0, 0), width=2)
+            # Draw the classic soccer ball pattern
+            # Hexagons and pentagons
+            for i in range(8):
+                angle = i * (2 * math.pi / 8)
+                radius_factor = 0.7 if i % 2 == 0 else 0.85
+                x = ball_center[0] + ball_radius * radius_factor * math.cos(angle)
+                y = ball_center[1] + ball_radius * radius_factor * math.sin(angle)
+                
+                if i % 2 == 0:
+                    # Pentagon (black)
+                    try:
+                        draw.regular_polygon((x, y, 5), 5, rotation=0, fill=(0, 0, 0))
+                    except AttributeError:
+                        # Fallback if regular_polygon not available
+                        draw.ellipse([(x-4, y-4), (x+4, y+4)], fill=(0, 0, 0))
+                else:
+                    # Hexagon (using small black circles as approximation)
+                    draw.ellipse([(x-3, y-3), (x+3, y+3)], fill=(0, 0, 0))
+            
+            # Add seam lines to make it look more like a soccer ball
+            # Horizontal seam
+            draw.arc([
+                (ball_center[0] - ball_radius, ball_center[1] - ball_radius),
+                (ball_center[0] + ball_radius, ball_center[1] + ball_radius)
+            ], 0, 180, fill=(0, 0, 0), width=1)
+            
+            # Vertical seam
+            draw.arc([
+                (ball_center[0] - ball_radius, ball_center[1] - ball_radius),
+                (ball_center[0] + ball_radius, ball_center[1] + ball_radius)
+            ], 270, 90, fill=(0, 0, 0), width=1)
+            
+            # Diagonal seams
+            draw.line([
+                (ball_center[0] - ball_radius * 0.7, ball_center[1] - ball_radius * 0.7),
+                (ball_center[0] + ball_radius * 0.7, ball_center[1] + ball_radius * 0.7)
+            ], fill=(0, 0, 0), width=1)
+            
+            draw.line([
+                (ball_center[0] - ball_radius * 0.7, ball_center[1] + ball_radius * 0.7),
+                (ball_center[0] + ball_radius * 0.7, ball_center[1] - ball_radius * 0.7)
+            ], fill=(0, 0, 0), width=1)
+            
+            # Add highlight to make the ball look 3D
+            highlight_radius = ball_radius * 0.3
+            highlight_offset = ball_radius * 0.4
+            draw.ellipse([
+                (ball_center[0] - highlight_radius - highlight_offset, 
+                 ball_center[1] - highlight_radius - highlight_offset),
+                (ball_center[0] + highlight_radius - highlight_offset, 
+                 ball_center[1] + highlight_radius - highlight_offset)
+            ], fill=(255, 255, 255, 180))
+            
+            # If the shot was saved, add a small motion blur effect
+            if not goal_scored:
+                for i in range(3):
+                    offset = i * 5
+                    opacity = 100 - (i * 30)  # Decreasing opacity
+                    if shot_direction == "left":
+                        draw.ellipse([
+                            (ball_center[0] + offset - ball_radius * 0.7, ball_center[1] - ball_radius * 0.7),
+                            (ball_center[0] + offset + ball_radius * 0.7, ball_center[1] + ball_radius * 0.7)
+                        ], fill=(255, 255, 255, opacity), outline=None)
+                    elif shot_direction == "right":
+                        draw.ellipse([
+                            (ball_center[0] - offset - ball_radius * 0.7, ball_center[1] - ball_radius * 0.7),
+                            (ball_center[0] - offset + ball_radius * 0.7, ball_center[1] + ball_radius * 0.7)
+                        ], fill=(255, 255, 255, opacity), outline=None)
+                    else:
+                        draw.ellipse([
+                            (ball_center[0] - ball_radius * 0.7, ball_center[1] - offset - ball_radius * 0.7),
+                            (ball_center[0] + ball_radius * 0.7, ball_center[1] - offset + ball_radius * 0.7)
+                        ], fill=(255, 255, 255, opacity), outline=None)
             
             # Draw the shot path with arrow
             start_point = (img_width // 2, img_height - 80)
@@ -874,9 +914,15 @@ class PenaltyCog(commands.Cog):
                 
                 draw.text((img_width//2, 50), result_text, font=result_font, fill=text_color, anchor="mm")
             
-            # Add "BETSYNC" watermark
-            watermark_font = ImageFont.truetype("roboto.ttf", 60)
-            draw.text((img_width // 2, img_height - 30), "BETSYNC", font=watermark_font, fill=(0, 0, 0, 64), anchor="mm")
+            # Add "BETSYNC" watermark at the top with transparency
+            watermark_font = ImageFont.truetype("roboto.ttf", 50)
+            draw.text(
+                (img_width // 2, 40), 
+                "BETSYNC", 
+                font=watermark_font, 
+                fill=(0, 0, 0, 64),  # More transparent
+                anchor="mm"
+            )
             
             return image
             
