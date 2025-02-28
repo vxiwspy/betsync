@@ -1,4 +1,3 @@
-
 import discord
 import random
 import asyncio
@@ -522,7 +521,7 @@ class PlinkoCog(commands.Cog):
             winnings = bet_amount * multiplier
 
             # Generate the Plinko board image
-            plinko_image = self.generate_plinko_image(rows, path, landing_position, multipliers)
+            plinko_image = self.generate_plinko_image(rows, path, landing_position, multipliers, bet_amount, multiplier)
 
             # Create results embed
             if multiplier >= 1:
@@ -710,7 +709,7 @@ class PlinkoCog(commands.Cog):
 
         return path, landing_position
 
-    def generate_plinko_image(self, rows, path, landing_position, multipliers):
+    def generate_plinko_image(self, rows, path, landing_position, multipliers, bet_amount, multiplier):
         """Generate an image of the Plinko board with the ball's path"""
         # Define colors and sizes
         bg_color = (33, 33, 33)        # Dark background
@@ -718,6 +717,8 @@ class PlinkoCog(commands.Cog):
         ball_color = (0, 255, 0)       # Green ball
         path_color = (0, 200, 0, 128)  # Semi-transparent green path
         text_color = (255, 255, 255)   # White text
+        win_text_color = (255, 255, 255)  # White text for win display
+        win_display_bg = (0, 100, 0, 200)  # Semi-transparent dark green background for win display
         multiplier_colors = {
             'high': (255, 50, 50),     # Red for high multipliers
             'medium': (255, 165, 0),   # Orange for medium multipliers
@@ -732,25 +733,25 @@ class PlinkoCog(commands.Cog):
         # Enhanced scaling for better readability with many rows
         # Keep full size until 11 rows, then scale more gradually
         scale_factor = min(1.0, 12 / max(10, rows))
-        
+
         # For extreme modes with many multipliers, make the image wider
         width_scale = 1.2 if len(multipliers) < 13 else min(1.6, len(multipliers) / 10)  # Increased scaling
         # Less aggressive height scaling to avoid elongation
         height_scale = 1.0 if rows <= 10 else min(1.3, rows / 10)
-        
+
         # Calculate dimensions with a better aspect ratio - prioritizing width
         width = int(base_width * width_scale)
         height = int(base_height * height_scale / scale_factor)
-        
+
         # For configurations with many rows and multipliers, increase the base size
         if rows >= 14 or len(multipliers) >= 15:
             width = int(width * 1.25)  # More horizontal expansion
             height = int(height * 1.1)
-        
+
         # Ensure the width is at least 1.2x the height to emphasize horizontal expansion
         if width < height * 1.2:
             width = int(height * 1.2)
-        
+
         # Adjust sizes based on scale - increased sizes for better visibility
         peg_radius = max(9, int(16 * scale_factor))  # Larger minimum size for better visibility
         ball_radius = max(15, int(24 * scale_factor))  # Larger minimum size for better visibility
@@ -802,7 +803,7 @@ class PlinkoCog(commands.Cog):
         # More slots means smaller font to avoid overlap, but maintain larger minimum size
         multiplier_font_size = max(24, int(35 * min(1.0, 12 / len(multipliers))))  # Increased base size
         multiplier_font = ImageFont.truetype("roboto.ttf", multiplier_font_size)
-        
+
         # For extreme mode with many rows, adjust text spacing and font size
         if rows >= 11:
             # Increase spacing between multipliers
@@ -815,7 +816,7 @@ class PlinkoCog(commands.Cog):
             y_offset = 35 * scale_factor  # Increased from 30
             text_skip_factor = max(1, int(len(multipliers) / 14))  # Reduced from 12 to show more multipliers
             text_outline = True  # Always use text outline for better readability
-        
+
         # Draw the multipliers
         for i, multiplier in enumerate(multipliers):
             # Determine color based on multiplier value - adjusted thresholds for new higher multipliers
@@ -832,7 +833,7 @@ class PlinkoCog(commands.Cog):
             x = i * slot_width + slot_width / 2
             y = slot_y + y_offset
             multiplier_text = f"{multiplier}x"
-            
+
             # If slots are too close, only show every Nth multiplier
             if i % text_skip_factor == 0 or i == landing_position:
                 # Add outline effect for better text readability in extreme mode
@@ -843,11 +844,11 @@ class PlinkoCog(commands.Cog):
                     for offset_x, offset_y in [(2,2), (-2,-2), (2,-2), (-2,2), (0,2), (2,0), (-2,0), (0,-2), 
                                               (1,2), (-1,2), (2,1), (2,-1), (-2,1), (-2,-1), (1,-2), (-1,-2)]:
                         draw.text((x+offset_x, y+offset_y), multiplier_text, font=multiplier_font, fill=outline_color, anchor="mm")
-                    
+
                     # Then draw closer outline for sharpness
                     for offset_x, offset_y in [(1,1), (-1,-1), (1,-1), (-1,1), (0,1), (1,0), (-1,0), (0,-1)]:
                         draw.text((x+offset_x, y+offset_y), multiplier_text, font=multiplier_font, fill=outline_color, anchor="mm")
-                
+
                 # Draw the actual text with slightly increased brightness for better visibility
                 bright_color = tuple(min(255, c + 30) for c in color[:3]) + (color[3:] if len(color) > 3 else ())
                 draw.text((x, y), multiplier_text, font=multiplier_font, fill=bright_color, anchor="mm")
@@ -857,7 +858,7 @@ class PlinkoCog(commands.Cog):
                 # Draw a more visible rectangle around the winning multiplier
                 padding = 8 * scale_factor
                 text_bbox = draw.textbbox((x, y), multiplier_text, font=multiplier_font, anchor="mm")
-                
+
                 # Draw a filled background rectangle first for better contrast
                 draw.rectangle(
                     (
@@ -869,7 +870,7 @@ class PlinkoCog(commands.Cog):
                     fill=(0, 0, 0, 150),  # Semi-transparent black background
                     outline=None
                 )
-                
+
                 # Then draw the highlight border with increased thickness
                 draw.rectangle(
                     (
@@ -891,11 +892,85 @@ class PlinkoCog(commands.Cog):
             fill=ball_color
         )
 
+        # Add win amount display in top right corner
+        win_amount = bet_amount * multiplier
+        win_display_font_size = max(30, int(40 * scale_factor))
+        win_display_font = ImageFont.truetype("roboto.ttf", win_display_font_size)
+
+        # Position in top right with padding
+        win_display_x = width - 20 * scale_factor
+        win_display_y = 20 * scale_factor
+
+        # Create win display text
+        if multiplier >= 1:
+            win_display_text = f"WIN: {win_amount:.2f}"
+            win_bg_color = (0, 120, 0, 220)  # Dark green for wins
+            win_outline_color = (100, 255, 100)  # Light green outline
+            win_icon = "🏆 "
+        else:
+            win_display_text = f"LOSS: {bet_amount:.2f}"
+            win_bg_color = (120, 0, 0, 220)  # Dark red for losses
+            win_outline_color = (255, 100, 100)  # Light red outline
+            win_icon = "❌ "
+
+        # Add multiplier display
+        multiplier_display_text = f"{multiplier:.2f}x"
+
+        # Get text sizes for background
+        win_text_bbox = draw.textbbox((win_display_x, win_display_y), win_icon + win_display_text, 
+                                     font=win_display_font, anchor="rt")
+        multiplier_text_bbox = draw.textbbox((win_display_x, win_display_y + win_display_font_size * 1.2), 
+                                           multiplier_display_text, font=win_display_font, anchor="rt")
+
+        # Calculate combined background dimensions
+        box_width = max(win_text_bbox[2] - win_text_bbox[0], multiplier_text_bbox[2] - multiplier_text_bbox[0]) + 30 * scale_factor
+        box_height = (multiplier_text_bbox[3] - win_text_bbox[1]) + 30 * scale_factor
+
+        # Draw rounded rectangle background
+        corner_radius = 15 * scale_factor
+        draw.rounded_rectangle(
+            (win_display_x - box_width, 
+             win_display_y - 15 * scale_factor, 
+             win_display_x + 10 * scale_factor, 
+             win_display_y + box_height),
+            fill=win_bg_color,
+            radius=corner_radius
+        )
+
+        # Draw outline for better visibility
+        draw.rounded_rectangle(
+            (win_display_x - box_width, 
+             win_display_y - 15 * scale_factor, 
+             win_display_x + 10 * scale_factor, 
+             win_display_y + box_height),
+            outline=win_outline_color,
+            radius=corner_radius,
+            width=max(2, int(3 * scale_factor))
+        )
+
+        # Draw text stroke/outline for better visibility
+        for offset_x, offset_y in [(1,1), (-1,-1), (1,-1), (-1,1)]:
+            draw.text((win_display_x+offset_x, win_display_y+offset_y), 
+                     win_icon + win_display_text, font=win_display_font, 
+                     fill=(0, 0, 0, 200), anchor="rt")
+            draw.text((win_display_x+offset_x, win_display_y+win_display_font_size*1.2+offset_y), 
+                     multiplier_display_text, font=win_display_font, 
+                     fill=(0, 0, 0, 200), anchor="rt")
+
+        # Draw main text
+        draw.text((win_display_x, win_display_y), 
+                 win_icon + win_display_text, font=win_display_font, 
+                 fill=win_text_color, anchor="rt")
+        draw.text((win_display_x, win_display_y+win_display_font_size*1.2), 
+                 multiplier_display_text, font=win_display_font, 
+                 fill=win_text_color, anchor="rt")
+
+
         # Adjust image aspect ratio if needed to prevent compression/elongation
         if height > 1200 or width > 1500:  # Increased limits for larger images
             # Calculate aspect ratio
             aspect_ratio = width / height
-            
+
             # Determine new dimensions while maintaining aspect ratio
             # Prioritize width for better horizontal expansion
             if aspect_ratio < 1.2:  # If image is too tall relative to width
@@ -904,11 +979,11 @@ class PlinkoCog(commands.Cog):
             else:
                 new_width = min(1500, width)  # Allow wider images
                 new_height = int(new_width / aspect_ratio)
-                
+
             # Ensure minimum dimensions
             new_width = max(1000, new_width)  # Increased from 800
             new_height = max(800, new_height)
-            
+
             # Resize the image
             img = img.resize((new_width, new_height), Image.LANCZOS)
 
