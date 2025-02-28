@@ -254,6 +254,7 @@ class PlinkoCog(commands.Cog):
                 "variance": 0.25
             }
         }
+        }
     }
 }
 
