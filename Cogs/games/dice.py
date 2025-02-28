@@ -269,15 +269,56 @@ class DiceCog(commands.Cog):
             user_dice = dice_emojis.get(user_roll, "🎲")
             dealer_dice = dice_emojis.get(dealer_roll, "🎲")
 
-            # Determine the winner
+            # Determine the winner or if it's a draw
+            is_draw = user_roll == dealer_roll
             user_won = user_roll > dealer_roll
 
             # Define the multiplier (for a win)
             # House edge of at least 4%
-            multiplier = 1.9  # With 6 sides, fair would be 2.0, so 1.9 gives ~5% house edge
+            multiplier = 1.95  # With 6 sides, fair would be 2.0, so 1.95 gives 2.5% house edge
 
             # Create result embed
-            if user_won:
+            if is_draw:
+                # Return the bet for a draw
+                result_embed = discord.Embed(
+                    title="🎲 | Dice Game - It's a Draw!",
+                    description=(
+                        f"{bet_description}\n\n"
+                        f"Your Roll: {user_dice} ({user_roll})\n"
+                        f"Dealer Roll: {dealer_dice} ({dealer_roll})\n\n"
+                        f"**Result:** Your bet has been returned!"
+                    ),
+                    color=0xFFD700  # Gold color for draws
+                )
+                
+                # Return the bet to the user
+                db = Users()
+                if tokens_used > 0:
+                    db.update_balance(ctx.author.id, tokens_used, "tokens", "$inc")
+                if credits_used > 0:
+                    db.update_balance(ctx.author.id, credits_used, "credits", "$inc")
+                
+                # Add to history as a draw
+                servers_db = Servers()
+                history_entry = {
+                    "type": "draw",
+                    "game": "dice",
+                    "bet": total_bet,
+                    "amount": 0,  # No profit/loss on a draw
+                    "multiplier": 0,  # No multiplier applies on a draw
+                    "timestamp": int(time.time())
+                }
+                db.collection.update_one(
+                    {"discord_id": ctx.author.id},
+                    {"$push": {"history": {"$each": [history_entry], "$slice": -100}}}
+                )
+                
+                # Update server history
+                history_entry["user_id"] = ctx.author.id
+                history_entry["user_name"] = ctx.author.name
+                servers_db.update_history(ctx.guild.id, history_entry)
+                
+            elif user_won:
                 # Calculate winnings
                 winnings = round(total_bet * multiplier, 2)
                 profit = winnings - total_bet
