@@ -37,7 +37,7 @@ class PlayAgainView(discord.ui.View):
         try:
             await self.message.edit(view=self)
         except Exception as e:
-            print(f"Error updating message on timeout: {e}")ass
+            print(f"Error updating message on timeout: {e}")
 
 class DiceCog(commands.Cog):
     def __init__(self, bot):
@@ -54,14 +54,10 @@ class DiceCog(commands.Cog):
                     "**Dice** is a game where you roll against the dealer. Higher number wins!\n\n"
                     "**Usage:** `!dicegame <amount> [currency_type]`\n"
                     "**Example:** `!dicegame 100` or `!dicegame 100 tokens`\n\n"
-                    "- You and the dealer each roll a dice (1-6)\n"
-                    "- If your number is higher, you win!\n"
-                    "- If there's a tie or dealer wins, you lose your bet\n"
-                    "- House edge: 4% (you need to roll higher, not equal)\n\n"
-                    "You can bet using tokens (T) or credits (C):\n"
-                    "- If you have enough tokens, they will be used first\n"
-                    "- If you don't have enough tokens, credits will be used\n"
-                    "- If needed, both will be combined to meet your bet amount"
+                    "- **You and the dealer each roll a dice (1-6)**\n"
+                    "- **If your number is higher, you win!**\n"
+                    "- **If there's a tie or dealer wins, you lose your bet**\n"
+                    
                 ),
                 color=0x00FFAE
             )
