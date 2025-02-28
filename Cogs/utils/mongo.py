@@ -7,7 +7,7 @@ mongodb = MongoClient(os.environ["MONGO"])
 class Users:
     
     def __init__(self):
-        self.db = MongoClient["BetSync"]
+        self.db = mongodb["BetSync"]
         self.collection = self.db["users"]
 
     def get_all_users(self):

@@ -36,7 +36,7 @@ async def on_guild_join(guild):
         print(f"{Fore.GREEN}[+] {Fore.WHITE}New Server Registered: {Fore.GREEN}{resp}{Fore.WHITE}")
         return
 
-@bot.event
+#@bot.event
 async def on_command(ctx):
     if ctx.command.is_on_cooldown(ctx):
         return
