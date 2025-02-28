@@ -254,8 +254,8 @@ class PlinkoCog(commands.Cog):
                 "variance": 0.25
             }
         }
-            }
-        }
+    }
+}
 
         # Multiplier templates for different row counts
         # Each list represents the multipliers from left to right
