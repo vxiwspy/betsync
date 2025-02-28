@@ -173,60 +173,238 @@ class Fetches(commands.Cog):
         embed.set_footer(text="Betsync Casino", icon_url=self.bot.user.avatar.url)
         await ctx.reply(embed=embed)
     
-    @commands.command(aliases=["lb", "top"])
-    async def leaderboard(self, ctx, scope: str = None, currency_type: str = None):
-        """View the leaderboard for tokens or credits
+    # Leaderboard Pagination View
+    class LeaderboardView(discord.ui.View):
+        def __init__(self, author_id, all_data, page_size=10, timeout=60):
+            super().__init__(timeout=timeout)
+            self.author_id = author_id
+            self.all_data = all_data
+            self.page_size = page_size
+            self.current_page = 0
+            self.total_pages = max(1, (len(all_data) + page_size - 1) // page_size)
+            self.message = None
+            self.scope = all_data.get("scope", "global")
+            self.leaderboard_type = all_data.get("type", "balance")
+            self.currency = all_data.get("currency", "credits")
+            
+            # Disable buttons if not needed
+            self.update_buttons()
         
-        Usage: !leaderboard [global/server] [tokens/credits]
-        Default: !leaderboard global credits
-        """
-        # Set default values if not provided
-        if scope is None or scope.lower() not in ["global", "server"]:
-            if currency_type is None:
-                # If neither argument is provided, use defaults
-                scope = "global"
-                currency_type = "credits"
-            else:
-                # If only one argument is provided, check if it's a currency type
-                if currency_type.lower() in ["tokens", "credits"]:
-                    scope = "global"
+        def update_buttons(self):
+            # Disable/enable prev/next buttons based on current page
+            self.first_page_button.disabled = self.current_page == 0
+            self.prev_button.disabled = self.current_page == 0
+            self.next_button.disabled = self.current_page >= self.total_pages - 1
+            self.last_page_button.disabled = self.current_page >= self.total_pages - 1
+        
+        @discord.ui.button(label="<<", style=discord.ButtonStyle.gray, custom_id="first_page")
+        async def first_page_button(self, button, interaction):
+            if interaction.user.id != self.author_id:
+                return await interaction.response.send_message("This is not your leaderboard!", ephemeral=True)
+            
+            self.current_page = 0
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_current_page_embed(), view=self)
+        
+        @discord.ui.button(label="<", style=discord.ButtonStyle.gray, custom_id="prev_page")
+        async def prev_button(self, button, interaction):
+            if interaction.user.id != self.author_id:
+                return await interaction.response.send_message("This is not your leaderboard!", ephemeral=True)
+            
+            self.current_page = max(0, self.current_page - 1)
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_current_page_embed(), view=self)
+        
+        @discord.ui.button(label=">", style=discord.ButtonStyle.gray, custom_id="next_page")
+        async def next_button(self, button, interaction):
+            if interaction.user.id != self.author_id:
+                return await interaction.response.send_message("This is not your leaderboard!", ephemeral=True)
+            
+            self.current_page = min(self.total_pages - 1, self.current_page + 1)
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_current_page_embed(), view=self)
+        
+        @discord.ui.button(label=">>", style=discord.ButtonStyle.gray, custom_id="last_page")
+        async def last_page_button(self, button, interaction):
+            if interaction.user.id != self.author_id:
+                return await interaction.response.send_message("This is not your leaderboard!", ephemeral=True)
+            
+            self.current_page = self.total_pages - 1
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_current_page_embed(), view=self)
+        
+        def get_current_page_embed(self):
+            # Get data for current page
+            start_idx = self.current_page * self.page_size
+            end_idx = min(start_idx + self.page_size, len(self.all_data["users"]))
+            current_page_data = self.all_data["users"][start_idx:end_idx]
+            
+            # Create embed based on leaderboard type
+            if self.leaderboard_type == "balance":
+                return self.create_balance_embed(current_page_data, start_idx)
+            elif self.leaderboard_type == "wagered":
+                return self.create_wagered_embed(current_page_data, start_idx)
+            
+            # Default to balance embed
+            return self.create_balance_embed(current_page_data, start_idx)
+        
+        def create_balance_embed(self, users_data, start_idx):
+            currency_type = self.currency
+            scope_text = self.scope.capitalize()
+            currency_symbol = ":moneybag:" if currency_type == "tokens" else ":money_with_wings:"
+            
+            embed = discord.Embed(
+                title=f":trophy: {scope_text} {currency_type.capitalize()} Leaderboard",
+                description=f"Top users ranked by {currency_type} balance • Page {self.current_page + 1}/{self.total_pages}",
+                color=0x00FFAE
+            )
+            
+            for i, user_data in enumerate(users_data):
+                # Calculate actual position on leaderboard
+                position = start_idx + i + 1
+                
+                # Add medal emoji for top 3
+                if position == 1:
+                    medal = ":first_place:"
+                elif position == 2:
+                    medal = ":second_place:"
+                elif position == 3:
+                    medal = ":third_place:"
                 else:
-                    # If it's not a valid currency, it might be the scope
-                    if scope.lower() in ["global", "server"]:
-                        currency_type = "credits"
-                    else:
-                        # Show usage if arguments are invalid
-                        return await self.show_leaderboard_usage(ctx)
+                    medal = f"`{position}.`"
+                
+                # Format the amount with commas
+                balance = f"{user_data['amount']:,.2f}"
+                
+                embed.add_field(
+                    name=f"{medal} {user_data['name']}",
+                    value=f"{currency_symbol} **{balance}** {currency_type}",
+                    inline=False
+                )
+            
+            embed.set_footer(text="BetSync Casino", icon_url=self.all_data.get("bot_avatar", ""))
+            return embed
         
-        if currency_type is None or currency_type.lower() not in ["tokens", "credits"]:
-            currency_type = "credits"
+        def create_wagered_embed(self, users_data, start_idx):
+            scope_text = self.scope.capitalize()
+            
+            embed = discord.Embed(
+                title=f":fire: {scope_text} Wagering Leaderboard",
+                description=f"Top users ranked by total amount wagered • Page {self.current_page + 1}/{self.total_pages}",
+                color=0xFF5500
+            )
+            
+            for i, user_data in enumerate(users_data):
+                # Calculate actual position on leaderboard
+                position = start_idx + i + 1
+                
+                # Add medal emoji for top 3
+                if position == 1:
+                    medal = ":first_place:"
+                elif position == 2:
+                    medal = ":second_place:"
+                elif position == 3:
+                    medal = ":third_place:"
+                else:
+                    medal = f"`{position}.`"
+                
+                # Format the amount with commas
+                wagered = f"{user_data['amount']:,.2f}"
+                
+                embed.add_field(
+                    name=f"{medal} {user_data['name']}",
+                    value=f":money_with_wings: **{wagered}** wagered",
+                    inline=False
+                )
+            
+            embed.set_footer(text="BetSync Casino", icon_url=self.all_data.get("bot_avatar", ""))
+            return embed
         
-        # Normalize arguments
-        scope = scope.lower()
-        currency_type = currency_type.lower()
+        async def on_timeout(self):
+            # Disable all buttons when the view times out
+            for child in self.children:
+                child.disabled = True
+            
+            if self.message:
+                try:
+                    await self.message.edit(view=self)
+                except:
+                    pass
+
+    @commands.command(aliases=["lb", "top"])
+    async def leaderboard(self, ctx, arg1: str = None, arg2: str = None):
+        """View the leaderboard for tokens, credits, or wagered amount
         
+        Usage: !leaderboard [scope] [type] 
+        Examples: 
+        - !leaderboard global credits
+        - !leaderboard server tokens
+        - !leaderboard wagered
+        - !leaderboard server wagered
+        """
+        # Default values
+        scope = "global"
+        leaderboard_type = "balance"
+        currency_type = "credits"
+        
+        # Parse arguments (flexible order)
+        args = [a.lower() for a in [arg1, arg2] if a]
+        
+        # Check for scope
+        if "global" in args:
+            scope = "global"
+            args.remove("global")
+        elif "server" in args:
+            scope = "server"
+            args.remove("server")
+            
+        # Check for type
+        if "wagered" in args:
+            leaderboard_type = "wagered"
+            args.remove("wagered")
+        
+        # Remaining arg should be currency type (if balance type)
+        if args and leaderboard_type == "balance":
+            if args[0] in ["tokens", "credits"]:
+                currency_type = args[0]
+            else:
+                return await self.show_leaderboard_usage(ctx)
+                
+        # If in DM and requesting server leaderboard
+        if scope == "server" and ctx.guild is None:
+            return await ctx.reply("Server leaderboard can only be viewed in a server.")
+            
         # Get the leaderboard data
-        if scope == "global":
-            await self.show_global_leaderboard(ctx, currency_type)
-        else:  # scope == "server"
-            if ctx.guild is None:
-                return await ctx.reply("Server leaderboard can only be viewed in a server.")
-            await self.show_server_leaderboard(ctx, currency_type)
+        if leaderboard_type == "balance":
+            if scope == "global":
+                await self.show_global_leaderboard(ctx, currency_type)
+            else:  # scope == "server"
+                await self.show_server_leaderboard(ctx, currency_type)
+        else:  # leaderboard_type == "wagered"
+            if scope == "global":
+                await self.show_global_wagered_leaderboard(ctx)
+            else:  # scope == "server"
+                await self.show_server_wagered_leaderboard(ctx)
     
     async def show_leaderboard_usage(self, ctx):
         """Show usage information for leaderboard command"""
         embed = discord.Embed(
             title=":trophy: Leaderboard - Usage",
             description=(
-                "View the top users by tokens or credits.\n\n"
-                "**Usage:** `!leaderboard [scope] [currency]`\n"
-                "**Example:** `!leaderboard global credits`\n\n"
+                "View the top users by balance or wagered amount.\n\n"
+                "**Usage:** `!leaderboard [scope] [type]`\n\n"
+                "**Examples:**\n"
+                "`!leaderboard global credits` - Global credits leaderboard\n"
+                "`!leaderboard server tokens` - Server tokens leaderboard\n"
+                "`!leaderboard wagered` - Global wagering leaderboard\n"
+                "`!leaderboard server wagered` - Server wagering leaderboard\n\n"
                 "**Available Scopes:**\n"
                 "`global` - Show leaderboard across all servers\n"
                 "`server` - Show leaderboard for the current server\n\n"
-                "**Available Currencies:**\n"
+                "**Available Types:**\n"
                 "`tokens` - Show leaderboard by token balance\n"
-                "`credits` - Show leaderboard by credit balance"
+                "`credits` - Show leaderboard by credit balance\n"
+                "`wagered` - Show leaderboard by total amount wagered"
             ),
             color=0x00FFAE
         )
@@ -234,55 +412,45 @@ class Fetches(commands.Cog):
         return await ctx.reply(embed=embed)
     
     async def show_global_leaderboard(self, ctx, currency_type):
-        """Show global leaderboard for tokens or credits"""
+        """Show global leaderboard for tokens or credits with pagination"""
         db = Users()
-        # Get top 10 users sorted by the specified currency
-        users = list(db.collection.find().sort([(currency_type, -1)]).limit(10))
+        # Get all users sorted by the specified currency
+        users = list(db.collection.find().sort([(currency_type, -1)]))
         
         if not users:
             return await ctx.reply("No users found in the leaderboard.")
         
-        # Create embed
-        currency_symbol = ":moneybag:" if currency_type == "tokens" else ":money_with_wings:"
-        embed = discord.Embed(
-            title=f":trophy: Global {currency_type.capitalize()} Leaderboard",
-            description=f"Top users ranked by {currency_type} balance",
-            color=0x00FFAE
-        )
-        
-        # Add leaderboard entries
-        for i, user_data in enumerate(users):
+        # Prepare data for pagination
+        formatted_users = []
+        for user_data in users:
             try:
                 user = await self.bot.fetch_user(user_data["discord_id"])
                 user_name = user.name if user else f"User {user_data['discord_id']}"
                 
-                # Add medal emoji for top 3
-                if i == 0:
-                    medal = ":first_place:"
-                elif i == 1:
-                    medal = ":second_place:"
-                elif i == 2:
-                    medal = ":third_place:"
-                else:
-                    medal = f"`{i+1}.`"
-                
-                # Format the amount with commas
-                balance = f"{user_data[currency_type]:,.2f}"
-                
-                embed.add_field(
-                    name=f"{medal} {user_name}",
-                    value=f"{currency_symbol} **{balance}** {currency_type}",
-                    inline=False
-                )
+                formatted_users.append({
+                    "name": user_name,
+                    "amount": user_data[currency_type]
+                })
             except Exception as e:
                 print(f"Error getting user: {e}")
                 continue
         
-        embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
-        await ctx.reply(embed=embed)
+        # Create the data structure for the paginated view
+        leaderboard_data = {
+            "users": formatted_users,
+            "scope": "global",
+            "type": "balance",
+            "currency": currency_type,
+            "bot_avatar": self.bot.user.avatar.url
+        }
+        
+        # Create and send the paginated view
+        view = self.LeaderboardView(ctx.author.id, leaderboard_data)
+        message = await ctx.reply(embed=view.get_current_page_embed(), view=view)
+        view.message = message
     
     async def show_server_leaderboard(self, ctx, currency_type):
-        """Show server leaderboard for tokens or credits"""
+        """Show server leaderboard for tokens or credits with pagination"""
         db = Users()
         server_users = []
         
@@ -301,50 +469,125 @@ class Fetches(commands.Cog):
         # Sort the filtered users by the specified currency
         server_users.sort(key=lambda x: x[currency_type], reverse=True)
         
-        # Take top 10
-        server_users = server_users[:10]
-        
         if not server_users:
             return await ctx.reply("No users found in the server leaderboard.")
         
-        # Create embed
-        currency_symbol = ":moneybag:" if currency_type == "tokens" else ":money_with_wings:"
-        embed = discord.Embed(
-            title=f":trophy: {ctx.guild.name} {currency_type.capitalize()} Leaderboard",
-            description=f"Top users in this server ranked by {currency_type} balance",
-            color=0x00FFAE
-        )
-        
-        # Add leaderboard entries
-        for i, user_data in enumerate(server_users):
+        # Prepare data for pagination
+        formatted_users = []
+        for user_data in server_users:
             try:
                 user = await self.bot.fetch_user(user_data["discord_id"])
                 user_name = user.name if user else f"User {user_data['discord_id']}"
                 
-                # Add medal emoji for top 3
-                if i == 0:
-                    medal = ":first_place:"
-                elif i == 1:
-                    medal = ":second_place:"
-                elif i == 2:
-                    medal = ":third_place:"
-                else:
-                    medal = f"`{i+1}.`"
-                
-                # Format the amount with commas
-                balance = f"{user_data[currency_type]:,.2f}"
-                
-                embed.add_field(
-                    name=f"{medal} {user_name}",
-                    value=f"{currency_symbol} **{balance}** {currency_type}",
-                    inline=False
-                )
+                formatted_users.append({
+                    "name": user_name,
+                    "amount": user_data[currency_type]
+                })
             except Exception as e:
                 print(f"Error getting user: {e}")
                 continue
         
-        embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
-        await ctx.reply(embed=embed)
+        # Create the data structure for the paginated view
+        leaderboard_data = {
+            "users": formatted_users,
+            "scope": "server",
+            "type": "balance",
+            "currency": currency_type,
+            "bot_avatar": self.bot.user.avatar.url
+        }
+        
+        # Create and send the paginated view
+        view = self.LeaderboardView(ctx.author.id, leaderboard_data)
+        message = await ctx.reply(embed=view.get_current_page_embed(), view=view)
+        view.message = message
+    
+    async def show_global_wagered_leaderboard(self, ctx):
+        """Show global leaderboard for amount wagered with pagination"""
+        db = Users()
+        # Get all users, we'll sort by total_spent
+        users = list(db.collection.find().sort([("total_spent", -1)]))
+        
+        if not users:
+            return await ctx.reply("No users found in the leaderboard.")
+        
+        # Prepare data for pagination
+        formatted_users = []
+        for user_data in users:
+            try:
+                user = await self.bot.fetch_user(user_data["discord_id"])
+                user_name = user.name if user else f"User {user_data['discord_id']}"
+                
+                formatted_users.append({
+                    "name": user_name,
+                    "amount": user_data.get("total_spent", 0)
+                })
+            except Exception as e:
+                print(f"Error getting user: {e}")
+                continue
+        
+        # Create the data structure for the paginated view
+        leaderboard_data = {
+            "users": formatted_users,
+            "scope": "global",
+            "type": "wagered",
+            "bot_avatar": self.bot.user.avatar.url
+        }
+        
+        # Create and send the paginated view
+        view = self.LeaderboardView(ctx.author.id, leaderboard_data)
+        message = await ctx.reply(embed=view.get_current_page_embed(), view=view)
+        view.message = message
+    
+    async def show_server_wagered_leaderboard(self, ctx):
+        """Show server leaderboard for amount wagered with pagination"""
+        db = Users()
+        server_users = []
+        
+        # First get all users in the database
+        all_users = list(db.collection.find())
+        
+        # Get all members in the server
+        server_members = ctx.guild.members
+        server_member_ids = [member.id for member in server_members]
+        
+        # Filter users who are in this server
+        for user_data in all_users:
+            if user_data["discord_id"] in server_member_ids:
+                server_users.append(user_data)
+        
+        # Sort the filtered users by total_spent
+        server_users.sort(key=lambda x: x.get("total_spent", 0), reverse=True)
+        
+        if not server_users:
+            return await ctx.reply("No users found in the server leaderboard.")
+        
+        # Prepare data for pagination
+        formatted_users = []
+        for user_data in server_users:
+            try:
+                user = await self.bot.fetch_user(user_data["discord_id"])
+                user_name = user.name if user else f"User {user_data['discord_id']}"
+                
+                formatted_users.append({
+                    "name": user_name,
+                    "amount": user_data.get("total_spent", 0)
+                })
+            except Exception as e:
+                print(f"Error getting user: {e}")
+                continue
+        
+        # Create the data structure for the paginated view
+        leaderboard_data = {
+            "users": formatted_users,
+            "scope": "server",
+            "type": "wagered",
+            "bot_avatar": self.bot.user.avatar.url
+        }
+        
+        # Create and send the paginated view
+        view = self.LeaderboardView(ctx.author.id, leaderboard_data)
+        message = await ctx.reply(embed=view.get_current_page_embed(), view=view)
+        view.message = message
 
 
 def setup(bot):
