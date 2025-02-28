@@ -1,11 +1,144 @@
+
 import discord
-import random
 import asyncio
+import random
 import time
-import math
 from discord.ext import commands
 from Cogs.utils.mongo import Users, Servers
 from Cogs.utils.emojis import emoji
+
+
+class MineButton(discord.ui.Button):
+    def __init__(self, row, col, parent_view):
+        super().__init__(
+            style=discord.ButtonStyle.primary,
+            label="?",
+            row=row
+        )
+        self.row_idx = row
+        self.col_idx = col
+        self.parent_view = parent_view
+        self.revealed = False
+        self.is_mine = False
+        self.update_appearance()
+
+    def update_appearance(self):
+        if not self.revealed:
+            self.style = discord.ButtonStyle.primary
+            self.label = "?"
+            self.emoji = None
+        elif self.is_mine:
+            self.style = discord.ButtonStyle.danger
+            self.label = ""
+            self.emoji = "💣"
+        else:
+            self.style = discord.ButtonStyle.success
+            self.label = ""
+            self.emoji = "💎"
+        
+        # Disable if revealed or game over
+        self.disabled = self.revealed or self.parent_view.game_over or self.parent_view.cashed_out
+
+    async def callback(self, interaction: discord.Interaction):
+        # Check if it's the player's turn
+        if interaction.user.id != self.parent_view.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        # Check if game is already over
+        if self.parent_view.game_over or self.parent_view.cashed_out:
+            return await interaction.response.defer()
+        
+        # Calculate position in flat grid
+        position = self.row_idx * self.parent_view.board_size + self.col_idx
+        
+        # Check if this tile is a mine
+        self.is_mine = self.parent_view.mine_locations[self.row_idx][self.col_idx]
+        self.revealed = True
+        
+        if self.is_mine:
+            # Game over - player hit a mine
+            self.parent_view.game_over = True
+            
+            # Reveal all mines
+            for row in range(self.parent_view.board_size):
+                for col in range(self.parent_view.board_size):
+                    button = self.parent_view.get_button(row, col)
+                    if self.parent_view.mine_locations[row][col]:
+                        button.is_mine = True
+                        button.revealed = True
+                    button.update_appearance()
+            
+            # Update the message
+            embed = self.parent_view.create_embed(status="lose")
+            await interaction.response.edit_message(embed=embed, view=self.parent_view)
+            
+            # Process loss
+            await self.parent_view.process_loss(self.parent_view.ctx)
+            
+            # Create play again view
+            play_again_view = PlayAgainView(
+                self.parent_view.cog, 
+                self.parent_view.ctx, 
+                self.parent_view.bet_amount, 
+                self.parent_view.mines_count,
+                timeout=15
+            )
+            play_again_view.message = self.parent_view.message
+            
+            # Edit message with play again button
+            await self.parent_view.message.edit(view=play_again_view)
+            
+            # Clear from ongoing games
+            if self.parent_view.ctx.author.id in self.parent_view.cog.ongoing_games:
+                del self.parent_view.cog.ongoing_games[self.parent_view.ctx.author.id]
+                
+        else:
+            # Safe tile revealed
+            if position not in self.parent_view.revealed_tiles:
+                self.parent_view.revealed_tiles.append(position)
+                
+                # Calculate new multiplier
+                self.parent_view.update_multiplier()
+                
+                # Update all buttons
+                for row in range(self.parent_view.board_size):
+                    for col in range(self.parent_view.board_size):
+                        self.parent_view.get_button(row, col).update_appearance()
+                
+                # Update the message
+                embed = self.parent_view.create_embed(status="playing")
+                await interaction.response.edit_message(embed=embed, view=self.parent_view)
+                
+                # Check if all safe tiles revealed (auto cash out)
+                if len(self.parent_view.revealed_tiles) == (self.parent_view.board_size * self.parent_view.board_size) - self.parent_view.mines_count:
+                    # Auto cash out
+                    self.parent_view.cashed_out = True
+                    
+                    # Process win
+                    await self.parent_view.process_win(self.parent_view.ctx)
+                    
+                    # Update message with win state
+                    embed = self.parent_view.create_embed(status="win")
+                    
+                    # Create play again view
+                    play_again_view = PlayAgainView(
+                        self.parent_view.cog, 
+                        self.parent_view.ctx, 
+                        self.parent_view.bet_amount, 
+                        self.parent_view.mines_count,
+                        timeout=15
+                    )
+                    play_again_view.message = self.parent_view.message
+                    
+                    # Edit message with play again button
+                    await self.parent_view.message.edit(embed=embed, view=play_again_view)
+                    
+                    # Clear from ongoing games
+                    if self.parent_view.ctx.author.id in self.parent_view.cog.ongoing_games:
+                        del self.parent_view.cog.ongoing_games[self.parent_view.ctx.author.id]
+            else:
+                # Tile already revealed
+                await interaction.response.defer()
 
 
 class PlayAgainView(discord.ui.View):
@@ -41,25 +174,25 @@ class PlayAgainView(discord.ui.View):
             bet_amount = tokens_balance + credits_balance
             if bet_amount <= 0:
                 return await interaction.followup.send("You don't have enough funds to play again.", ephemeral=True)
-
+            
             # Ask user to confirm playing with max amount
             confirm_embed = discord.Embed(
                 title="⚠️ Insufficient Funds for Same Bet",
                 description=f"You don't have enough to bet {self.bet_amount:.2f} again.\nWould you like to bet your maximum available amount ({bet_amount:.2f}) instead?",
                 color=0xFFAA00
             )
-
+            
             confirm_view = discord.ui.View(timeout=30)
-
+            
             @discord.ui.button(label="Yes", style=discord.ButtonStyle.success)
             async def confirm_button(b, i):
                 if i.user.id != self.ctx.author.id:
                     return await i.response.send_message("This is not your game!", ephemeral=True)
-
+                
                 for child in confirm_view.children:
                     child.disabled = True
                 await i.response.edit_message(view=confirm_view)
-
+                
                 # Start a new game with max amount
                 if self.mines_count:
                     await self.cog.mines(self.ctx, str(bet_amount), None, str(self.mines_count))
@@ -92,7 +225,7 @@ class PlayAgainView(discord.ui.View):
         # Disable button after timeout
         for item in self.children:
             item.disabled = True
-
+        
         # Try to update the message if it exists
         if self.message:
             try:
@@ -102,7 +235,7 @@ class PlayAgainView(discord.ui.View):
 
 
 class MinesTileView(discord.ui.View):
-    def __init__(self, cog, ctx, bet_amount, mines_count, board_size=5, timeout=180):
+    def __init__(self, cog, ctx, bet_amount, mines_count, board_size=5, timeout=120):
         super().__init__(timeout=timeout)
         self.cog = cog
         self.ctx = ctx
@@ -123,8 +256,21 @@ class MinesTileView(discord.ui.View):
         self.current_multiplier = 1.0
         self.message = None
 
-        # Generate buttons for the 5x5 grid (using emojis instead of buttons)
-        # We'll use a single reaction emoji to reveal tiles
+        # Generate buttons for the 5x5 grid
+        self._create_buttons()
+        
+    def _create_buttons(self):
+        """Create all buttons for the 5x5 grid"""
+        for row in range(self.board_size):
+            for col in range(self.board_size):
+                self.add_item(MineButton(row, col, self))
+    
+    def get_button(self, row, col):
+        """Get a button at the specified position"""
+        for item in self.children:
+            if isinstance(item, MineButton) and item.row_idx == row and item.col_idx == col:
+                return item
+        return None
 
     def generate_mines(self):
         """Generate random mine locations"""
@@ -142,159 +288,105 @@ class MinesTileView(discord.ui.View):
             row = flat_grid[i * self.board_size : (i+1) * self.board_size]
             self.mine_locations.append(row)
 
-    def get_multiplier(self, revealed_count):
-        """Calculate multiplier based on number of revealed cells"""
+    def update_multiplier(self):
+        """Calculate current multiplier based on revealed tiles"""
+        # Base formula for multiplier
+        # The more mines and the more tiles revealed, the higher the multiplier
         total_cells = self.board_size * self.board_size
-        remaining_cells = total_cells - revealed_count
         safe_cells = total_cells - self.mines_count
-        remaining_safe = safe_cells - revealed_count
-
-        # Base formula with house edge of ~3-5%
-        house_edge = 0.96  # 4% house edge
-
-        if remaining_safe == 0:
-            # All safe cells revealed, max multiplier
-            return (total_cells / safe_cells) * house_edge
-
-        # Calculate fair multiplier and apply house edge
-        multiplier = (total_cells - revealed_count) / (total_cells - self.mines_count - revealed_count) * house_edge
-
-        # Round to 2 decimal places
-        return round(multiplier, 2)
-
-    def is_game_over(self, row, col):
-        """Check if the selected cell contains a mine"""
-        return self.mine_locations[row][col]
-
-    def get_board_display(self, reveal_all=False):
-        """Generate visual representation of the board"""
-        board_display = []
-        for row in range(self.board_size):
-            row_display = []
-            for col in range(self.board_size):
-                pos = (row, col)
-
-                if reveal_all:
-                    # Show all mines and gems
-                    if self.mine_locations[row][col]:
-                        row_display.append("💣")  # Mine
-                    else:
-                        row_display.append("💎")  # Gem
-                elif pos in self.revealed_tiles:
-                    # Show revealed tile
-                    row_display.append("💎")  # Gem (safe tile)
-                else:
-                    # Show unrevealed tile
-                    row_display.append("❓")  # Unrevealed
-
-            board_display.append(" ".join(row_display))
-
-        return "\n".join(board_display)
+        
+        # Base multiplier calculation
+        # Example formula: More tiles revealed = higher multiplier
+        # This can be tuned for game balance
+        if len(self.revealed_tiles) == 0:
+            self.current_multiplier = 1.0
+        else:
+            # Calculate fair multiplier based on probability
+            # House edge factored in by multiplying by ~0.97 (3% edge)
+            # This gives proper expected value
+            base_multi = (safe_cells / (safe_cells - len(self.revealed_tiles))) * 0.97
+            
+            # Round to 2 decimal places
+            self.current_multiplier = round(base_multi, 2)
+            
+            # Ensure minimum is 1.0
+            self.current_multiplier = max(1.0, self.current_multiplier)
 
     def create_embed(self, status="playing"):
-        """Create embed for current game state"""
-        # Format bet amount
-        bet_description = f"**Bet Amount:** {self.bet_amount:.2f} credits"
-
-        # Calculate current profit
-        potential_winnings = self.bet_amount * self.current_multiplier
-        profit = potential_winnings - self.bet_amount
-
+        """Create the game embed based on current state"""
         if status == "playing":
-            embed = discord.Embed(
-                title="💎 | Mines Game",
-                description=(
-                    f"{bet_description}\n"
-                    f"**Mines:** {self.mines_count}/{self.board_size*self.board_size}\n"
-                    f"**Current Multiplier:** {self.current_multiplier:.2f}x\n"
-                    f"**Potential Winnings:** {potential_winnings:.2f} credits\n"
-                    f"**Profit:** {profit:.2f} credits\n\n"
-                    "Type a position (e.g., `A1`, `C3`) to reveal a tile or type `cash out` to take your winnings!\n\n"
-                    "⏰ This game will timeout after 2 minutes. If you've revealed tiles, you'll auto-cashout."
-                ),
-                color=0x00FFAE
-            )
-
-            # Add column labels (A-E) and row numbers (1-5)
-            board_with_labels = "⠀⠀A⠀⠀B⠀⠀C⠀⠀D⠀⠀E\n"  # Using invisible character for alignment
-            board_lines = self.get_board_display().split("\n")
-            for i, line in enumerate(board_lines):
-                board_with_labels += f"{i+1} {line}\n"
-
-            embed.add_field(name="Game Board", value=board_with_labels, inline=False)
-
+            color = 0x3498db  # Blue
+            title = "🎮 | Mines Game"
         elif status == "win":
-            embed = discord.Embed(
-                title="💰 | You Cashed Out!",
-                description=(
-                    f"{bet_description}\n"
-                    f"**Mines:** {self.mines_count}/{self.board_size*self.board_size}\n"
-                    f"**Final Multiplier:** {self.current_multiplier:.2f}x\n"
-                    f"**Winnings:** {potential_winnings:.2f} credits\n"
-                    f"**Profit:** {profit:.2f} credits\n\n"
-                    "Congratulations! You've successfully cashed out."
-                ),
-                color=0x00FF00
-            )
-
-            # Show full board with mines revealed
-            board_with_labels = "⠀⠀A⠀⠀B⠀⠀C⠀⠀D⠀⠀E\n"
-            board_lines = self.get_board_display(reveal_all=True).split("\n")
-            for i, line in enumerate(board_lines):
-                board_with_labels += f"{i+1} {line}\n"
-
-            embed.add_field(name="Game Board", value=board_with_labels, inline=False)
-
+            color = 0x00FF00  # Green
+            title = "💰 | You Won!"
         elif status == "lose":
-            embed = discord.Embed(
-                title="💣 | Game Over!",
-                description=(
-                    f"{bet_description}\n"
-                    f"**Mines:** {self.mines_count}/{self.board_size*self.board_size}\n"
-                    f"**Final Multiplier:** {self.current_multiplier:.2f}x\n"
-                    f"**Winnings:** 0 credits\n\n"
-                    "You hit a mine! Better luck next time."
-                ),
-                color=0xFF0000
-            )
-
-            # Show full board with mines revealed
-            board_with_labels = "⠀⠀A⠀⠀B⠀⠀C⠀⠀D⠀⠀E\n"
-            board_lines = self.get_board_display(reveal_all=True).split("\n")
-            for i, line in enumerate(board_lines):
-                board_with_labels += f"{i+1} {line}\n"
-
-            embed.add_field(name="Game Board", value=board_with_labels, inline=False)
-
-        embed.set_footer(text="BetSync Casino", icon_url=self.cog.bot.user.avatar.url)
+            color = 0xFF0000  # Red
+            title = "❌ | Game Over!"
+        else:
+            color = 0x3498db
+            title = "🎮 | Mines Game"
+            
+        # Calculate profit
+        profit = 0
+        if status == "win" and len(self.revealed_tiles) > 0:
+            profit = (self.bet_amount * self.current_multiplier) - self.bet_amount
+            
+        # Create description based on game state
+        description = f"**Bet Amount:** {self.bet_amount:.2f}\n**Current Multiplier:** {self.current_multiplier:.2f}x\n"
+        
+        if status == "playing":
+            description += f"**Profit:** {profit:.2f} points\n"
+            description += f"**Mines:** {self.mines_count}/{self.board_size * self.board_size} | {len(self.revealed_tiles)}💎"
+            
+            # Add cash out instruction
+            if len(self.revealed_tiles) > 0:
+                description += "\n\nReact with 💰 to cash out!"
+        elif status == "win":
+            winnings = self.bet_amount * self.current_multiplier
+            description += f"**Profit:** {profit:.2f} points\n"
+            description += f"**Mines:** {self.mines_count}/{self.board_size * self.board_size} | {len(self.revealed_tiles)}💎\n\n"
+            description += f"**You won {winnings:.2f} credits!**"
+        elif status == "lose":
+            description += f"**Profit:** 0 points\n"
+            description += f"**Mines:** {self.mines_count}/{self.board_size * self.board_size} | {len(self.revealed_tiles)}💎\n\n"
+            description += "**You lost!**"
+            
+        embed = discord.Embed(title=title, description=description, color=color)
+        embed.set_footer(text="BetSync Casino", icon_url=self.ctx.bot.user.avatar.url)
         return embed
-
+        
     async def process_win(self, ctx):
-        """Process a win when user cashes out"""
+        """Process win for the player"""
+        # Calculate winnings
+        winnings = self.bet_amount * self.current_multiplier
+        
+        # Get database connection
         db = Users()
-        total_winnings = self.bet_amount * self.current_multiplier
-
-        # Give credits to the user
-        db.update_balance(ctx.author.id, total_winnings, "credits", "$inc")
-
+        
+        # Add credits to user (always give credits for winnings)
+        db.update_balance(ctx.author.id, winnings, "credits", "$inc")
+        
         # Add to win history
         win_entry = {
             "type": "win",
             "game": "mines",
             "bet": self.bet_amount,
-            "amount": total_winnings,
+            "amount": winnings,
             "multiplier": self.current_multiplier,
+            "mines": self.mines_count,
+            "tiles_revealed": len(self.revealed_tiles),
             "timestamp": int(time.time())
         }
         db.collection.update_one(
             {"discord_id": ctx.author.id},
             {"$push": {"history": {"$each": [win_entry], "$slice": -100}}}
         )
-
+        
         # Update server history
         server_db = Servers()
         server_data = server_db.fetch_server(ctx.guild.id)
-
+        
         if server_data:
             server_win_entry = {
                 "type": "win",
@@ -302,46 +394,51 @@ class MinesTileView(discord.ui.View):
                 "user_id": ctx.author.id,
                 "user_name": ctx.author.name,
                 "bet": self.bet_amount,
-                "amount": total_winnings,
+                "amount": winnings,
                 "multiplier": self.current_multiplier,
+                "mines": self.mines_count,
+                "tiles_revealed": len(self.revealed_tiles),
                 "timestamp": int(time.time())
             }
             server_db.collection.update_one(
                 {"server_id": ctx.guild.id},
                 {"$push": {"server_bet_history": {"$each": [server_win_entry], "$slice": -100}}}
             )
-
+            
+            # Update server profit (negative value because server loses when player wins)
+            profit = winnings - self.bet_amount
+            server_db.update_server_profit(ctx.guild.id, -profit)
+        
         # Update user stats
         db.collection.update_one(
             {"discord_id": ctx.author.id},
-            {"$inc": {"total_won": 1, "total_earned": total_winnings}}
+            {"$inc": {"total_won": 1, "total_earned": winnings}}
         )
-
-        # Update server profit (negative because player won)
-        profit = self.bet_amount - total_winnings
-        server_db.update_server_profit(ctx.guild.id, profit)
-
+        
     async def process_loss(self, ctx):
-        """Process a loss when user hits a mine"""
+        """Process loss for the player"""
+        # Get database connection
         db = Users()
-
+        
         # Add to loss history
         loss_entry = {
             "type": "loss",
             "game": "mines",
             "bet": self.bet_amount,
             "amount": self.bet_amount,
+            "mines": self.mines_count,
+            "tiles_revealed": len(self.revealed_tiles),
             "timestamp": int(time.time())
         }
         db.collection.update_one(
             {"discord_id": ctx.author.id},
             {"$push": {"history": {"$each": [loss_entry], "$slice": -100}}}
         )
-
+        
         # Update server history
         server_db = Servers()
         server_data = server_db.fetch_server(ctx.guild.id)
-
+        
         if server_data:
             server_loss_entry = {
                 "type": "loss",
@@ -349,59 +446,90 @@ class MinesTileView(discord.ui.View):
                 "user_id": ctx.author.id,
                 "user_name": ctx.author.name,
                 "bet": self.bet_amount,
+                "mines": self.mines_count,
+                "tiles_revealed": len(self.revealed_tiles),
                 "timestamp": int(time.time())
             }
             server_db.collection.update_one(
                 {"server_id": ctx.guild.id},
                 {"$push": {"server_bet_history": {"$each": [server_loss_entry], "$slice": -100}}}
             )
-
+            
             # Update server profit
-            server_db.update_server_profit(ctx.guild.id, self.bet_amount)
-
+            server_db.collection.update_one(
+                {"server_id": ctx.guild.id},
+                {"$inc": {"total_profit": self.bet_amount}}
+            )
+        
         # Update user stats
         db.collection.update_one(
             {"discord_id": ctx.author.id},
             {"$inc": {"total_lost": 1}}
         )
-
+    
     async def on_timeout(self):
-        """Handle timeout - auto cash out if possible"""
-        if not self.game_over and not self.cashed_out and len(self.revealed_tiles) > 0:
-            # Auto cash out
-            self.cashed_out = True
-
-            try:
-                # Process winnings
+        """Handle timeout - auto cash out if player has revealed tiles"""
+        if not self.game_over and not self.cashed_out:
+            if len(self.revealed_tiles) > 0:
+                # Auto cash out
+                self.cashed_out = True
+                
+                # Process win
                 await self.process_win(self.ctx)
-
+                
                 # Update message with win state
                 embed = self.create_embed(status="win")
-
+                embed.description += "\n\n*Game auto-cashed out due to timeout.*"
+                
                 # Create play again view
-                play_again_view = PlayAgainView(self.cog, self.ctx, self.bet_amount, self.mines_count, timeout=15)
-                await self.message.edit(embed=embed, view=play_again_view)
-                play_again_view.message = self.message
-
-                # Clear game from ongoing games
-                if self.ctx.author.id in self.cog.ongoing_games:
-                    del self.cog.ongoing_games[self.ctx.author.id]
-
-            except Exception as e:
-                print(f"Error in auto cash out: {e}")
-        elif not self.game_over and not self.cashed_out and len(self.revealed_tiles) == 0:
-            # Deduct bet amount if no tiles revealed
-            db = Users()
-            db.update_balance(self.ctx.author.id, self.bet_amount, "credits")
-            await self.message.edit(content = f"Time ran out! You did not reveal any tiles. Your bet of {self.bet_amount:.2f} credits has been deducted.")
-
-        else:
-            # Just disable the view
-            if self.message:
+                play_again_view = PlayAgainView(
+                    self.cog, 
+                    self.ctx, 
+                    self.bet_amount, 
+                    self.mines_count,
+                    timeout=15
+                )
+                
+                # Update message
                 try:
-                    await self.message.edit(view=None)
+                    await self.message.edit(embed=embed, view=play_again_view)
+                    play_again_view.message = self.message
                 except:
                     pass
+                
+                # Clear from ongoing games
+                if self.ctx.author.id in self.cog.ongoing_games:
+                    del self.cog.ongoing_games[self.ctx.author.id]
+            else:
+                # No tiles revealed, count as loss
+                self.game_over = True
+                
+                # Process loss
+                await self.process_loss(self.ctx)
+                
+                # Update message
+                embed = self.create_embed(status="lose")
+                embed.description += "\n\n*Game timed out without any tiles revealed.*"
+                
+                # Create play again view
+                play_again_view = PlayAgainView(
+                    self.cog, 
+                    self.ctx, 
+                    self.bet_amount, 
+                    self.mines_count,
+                    timeout=15
+                )
+                
+                # Update message
+                try:
+                    await self.message.edit(embed=embed, view=play_again_view)
+                    play_again_view.message = self.message
+                except:
+                    pass
+                
+                # Clear from ongoing games
+                if self.ctx.author.id in self.cog.ongoing_games:
+                    del self.cog.ongoing_games[self.ctx.author.id]
 
 
 class MinesCog(commands.Cog):
@@ -409,109 +537,47 @@ class MinesCog(commands.Cog):
         self.bot = bot
         self.ongoing_games = {}
 
-    async def handle_tile_selection(self, message, ctx, game_view):
-        """Handle tile selection via message"""
-        if game_view.game_over or game_view.cashed_out:
-            return
-
-        # Parse the position (like A1, B3, etc.)
-        content = message.content.upper()
-
-        # Check for cash out
-        if content.lower() in ["CASH OUT", "CASHOUT", "CASH", "OUT", "STOP"]:
-            if len(game_view.revealed_tiles) > 0:
-                # User wants to cash out
-                game_view.cashed_out = True
-
-                # Process win
-                await game_view.process_win(ctx)
-
-                # Update message with win state
-                embed = game_view.create_embed(status="win")
-
-                # Create play again view with 15-second timeout
-                play_again_view = PlayAgainView(self, ctx, game_view.bet_amount, game_view.mines_count, timeout=15)
-                await game_view.message.edit(embed=embed, view=play_again_view)
-                play_again_view.message = game_view.message
-
-                # Clear game from ongoing games
-                if ctx.author.id in self.ongoing_games:
-                    del self.ongoing_games[ctx.author.id]
-            else:
-                # Can't cash out before revealing any tiles
-                await ctx.send("You need to reveal at least one tile before cashing out.", delete_after=5)
-
-            return
-
-        # Check for position format (A1, B3, etc.)
-        if len(content) != 2 or not content[0].isalpha() or not content[1].isdigit():
-            return
-
-        # Convert letter to column (A=0, B=1, etc.)
-        try:
-            col = ord(content[0]) - ord('A')
-            # Convert number to row (1=0, 2=1, etc.)
-            row = int(content[1]) - 1
-
-            # Check if valid position
-            if row < 0 or row >= game_view.board_size or col < 0 or col >= game_view.board_size:
-                return
-
-            # Check if already revealed
-            if (row, col) in game_view.revealed_tiles:
-                await ctx.send("That tile is already revealed. Choose another position.", delete_after=5)
-                return
-
-            # Check if it's a mine
-            if game_view.is_game_over(row, col):
-                # Game over - hit a mine
-                game_view.game_over = True
-
-                # Process loss
-                await game_view.process_loss(ctx)
-
-                # Update message with loss state
-                embed = game_view.create_embed(status="lose")
-
-                # Create play again view with 15-second timeout
-                play_again_view = PlayAgainView(self, ctx, game_view.bet_amount, game_view.mines_count, timeout=15)
-                await game_view.message.edit(embed=embed, view=play_again_view)
-                play_again_view.message = game_view.message
-
-                # Clear game from ongoing games
-                if ctx.author.id in self.ongoing_games:
-                    del self.ongoing_games[ctx.author.id]
-
-                return
-
-            # Reveal tile and update multiplier
-            game_view.revealed_tiles.append((row, col))
-            game_view.current_multiplier = game_view.get_multiplier(len(game_view.revealed_tiles))
-
-            # Update message with new board state
-            embed = game_view.create_embed(status="playing")
-            await game_view.message.edit(embed=embed)
-
-        except Exception as e:
-            print(f"Error handling tile selection: {e}")
-
     @commands.Cog.listener()
-    async def on_message(self, message):
-        """Listen for tile selections from active games"""
-        # Ignore bot messages
-        if message.author.bot:
-            return
-
-        # Check if user has an active game
-        if message.author.id in self.ongoing_games:
-            ctx = await self.bot.get_context(message)
-            if ctx.command is None:  # Only process if not a command
-                game_data = self.ongoing_games.get(message.author.id)
-                if game_data and "view" in game_data:
-                    await self.handle_tile_selection(message, ctx, game_data["view"])
+    async def on_reaction_add(self, reaction, user):
+        # Check if this is a cash out reaction for a mines game
+        if str(reaction.emoji) == "💰" and user.id in self.ongoing_games:
+            game_data = self.ongoing_games.get(user.id)
+            if game_data and "view" in game_data:
+                game_view = game_data["view"]
+                # Only process if it's the game owner and the game is still active
+                if (user.id == game_view.ctx.author.id and 
+                    reaction.message.id == game_view.message.id and
+                    not game_view.game_over and not game_view.cashed_out and
+                    len(game_view.revealed_tiles) > 0):
+                    
+                    # Set cash out
+                    game_view.cashed_out = True
+                    
+                    # Process win
+                    await game_view.process_win(game_view.ctx)
+                    
+                    # Update message with win state
+                    embed = game_view.create_embed(status="win")
+                    
+                    # Create play again view
+                    play_again_view = PlayAgainView(
+                        self, 
+                        game_view.ctx, 
+                        game_view.bet_amount, 
+                        game_view.mines_count,
+                        timeout=15
+                    )
+                    
+                    # Update the message
+                    await game_view.message.edit(embed=embed, view=play_again_view)
+                    play_again_view.message = game_view.message
+                    
+                    # Clear from ongoing games
+                    if user.id in self.ongoing_games:
+                        del self.ongoing_games[user.id]
 
     def calculate_max_mines(self):
-        """Calculate maximum mines possible on a 5x5 grid"""
+        """Calculate maximum allowed mines"""
         # We need at least one safe tile
         return 24  # 5x5 grid - 1 safe tile
 
@@ -526,9 +592,9 @@ class MinesCog(commands.Cog):
                     "**Mines** is a game where you reveal tiles to find gems while avoiding mines.\n\n"
                     "**Usage:** `!mines <amount> [currency_type] [mine_count]`\n"
                     "**Example:** `!mines 100` or `!mines 100 tokens 5`\n\n"
-                    "- **Reveal tiles by typing the position (e.g., A1, C3)**\n"
+                    "- **Click on buttons to reveal tiles**\n"
                     "- **Each safe tile increases your multiplier**\n"
-                    "- **Type `cash out` to take your winnings at any time**\n"
+                    "- **React with 💰 to cash out your winnings**\n"
                     "- **Hit a mine and you lose your bet**\n"
                     f"- **You can set 1-24 mines (default is 5)**\n"
                     "**Game Timeout:** 2 minutes. Auto cash-out if you have revealed any tiles before the timeout.\n"
@@ -599,7 +665,6 @@ class MinesCog(commands.Cog):
                     await ctx.send(f"Maximum mines allowed is {max_mines}. Setting to {max_mines} mines.", delete_after=5)
             except ValueError:
                 mines_count = 5
-                await ctx.send("Invalid mines count. Using default of 5 mines.", delete_after=5)
 
         # Validate bet amount
         try:
@@ -625,7 +690,7 @@ class MinesCog(commands.Cog):
                     color=0xFF0000
                 )
                 return await ctx.reply(embed=embed)
-
+                
         except ValueError:
             await loading_message.delete()
             embed = discord.Embed(
@@ -639,11 +704,7 @@ class MinesCog(commands.Cog):
         tokens_balance = user_data['tokens']
         credits_balance = user_data['credits']
 
-        # Determine which currency to use based on the logic:
-        # 1. If specific currency requested, try to use that
-        # 2. If has enough tokens, use tokens
-        # 3. If not enough tokens but enough credits, use credits
-        # 4. If neither is enough alone but combined they work, use both
+        # Determine which currency to use
         tokens_used = 0
         credits_used = 0
 
@@ -728,9 +789,12 @@ class MinesCog(commands.Cog):
         # Store message reference in game view
         game_view.message = game_message
 
-        # Inform user how to play
-        instruction_message = await ctx.send(
-            "💡 **How to play:** Type a position (like `A1` or `C3`) to reveal a tile. Type `cash out` to collect your winnings.  The game will timeout after 2 minutes.",
+        # Add cash out reaction
+        await game_message.add_reaction("💰")
+
+        # Inform user about timeout
+        await ctx.send(
+            "💡 **Click on the buttons to reveal tiles, and react with 💰 to cash out.** The game will timeout after 2 minutes.",
             delete_after=10
         )
 
