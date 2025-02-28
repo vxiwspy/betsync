@@ -725,8 +725,8 @@ class PlinkoCog(commands.Cog):
             'very_low': (150, 150, 150)  # Gray for very low multipliers
         }
 
-        # Dimensions - base size
-        base_width = 900
+        # Dimensions - base size with increased width for better horizontal expansion
+        base_width = 1200  # Increased from 900 for more horizontal space
         base_height = 800
 
         # Enhanced scaling for better readability with many rows
@@ -734,26 +734,26 @@ class PlinkoCog(commands.Cog):
         scale_factor = min(1.0, 12 / max(10, rows))
         
         # For extreme modes with many multipliers, make the image wider
-        width_scale = 1.0 if len(multipliers) < 13 else min(1.4, len(multipliers) / 11)
+        width_scale = 1.2 if len(multipliers) < 13 else min(1.6, len(multipliers) / 10)  # Increased scaling
         # Less aggressive height scaling to avoid elongation
-        height_scale = 1.0 if rows <= 10 else min(1.4, rows / 10)
+        height_scale = 1.0 if rows <= 10 else min(1.3, rows / 10)
         
-        # Calculate dimensions with a better aspect ratio
+        # Calculate dimensions with a better aspect ratio - prioritizing width
         width = int(base_width * width_scale)
         height = int(base_height * height_scale / scale_factor)
         
         # For configurations with many rows and multipliers, increase the base size
         if rows >= 14 or len(multipliers) >= 15:
-            width = int(width * 1.15)
+            width = int(width * 1.25)  # More horizontal expansion
             height = int(height * 1.1)
         
-        # Ensure the width is at least 0.9x the height to avoid vertical elongation
-        if width < height * 0.9:
-            width = int(height * 0.9)
+        # Ensure the width is at least 1.2x the height to emphasize horizontal expansion
+        if width < height * 1.2:
+            width = int(height * 1.2)
         
         # Adjust sizes based on scale - increased sizes for better visibility
-        peg_radius = max(7, int(14 * scale_factor))  # Larger minimum size of 7 pixels
-        ball_radius = max(12, int(20 * scale_factor))  # Larger minimum size of 12 pixels
+        peg_radius = max(9, int(16 * scale_factor))  # Larger minimum size for better visibility
+        ball_radius = max(15, int(24 * scale_factor))  # Larger minimum size for better visibility
 
         # Create a new image with dark background
         img = Image.new('RGBA', (width, height), bg_color)
@@ -798,22 +798,22 @@ class PlinkoCog(commands.Cog):
         slot_height = 40 * scale_factor
         slot_y = vertical_spacing + rows * vertical_spacing + 30 * scale_factor  # Below the last row of pegs
 
-        # Determine font size for multipliers - even larger sizes for better readability
+        # Determine font size for multipliers - significantly larger sizes for better readability
         # More slots means smaller font to avoid overlap, but maintain larger minimum size
-        multiplier_font_size = max(20, int(28 * min(1.0, 12 / len(multipliers))))
+        multiplier_font_size = max(24, int(35 * min(1.0, 12 / len(multipliers))))  # Increased base size
         multiplier_font = ImageFont.truetype("roboto.ttf", multiplier_font_size)
         
         # For extreme mode with many rows, adjust text spacing and font size
         if rows >= 11:
             # Increase spacing between multipliers
-            y_offset = 40 * scale_factor  # Push text down more to avoid overlap
+            y_offset = 45 * scale_factor  # Push text down more to avoid overlap
             # More aggressive skip factor for text clarity
-            text_skip_factor = max(1, int(len(multipliers) / 10))
+            text_skip_factor = max(1, int(len(multipliers) / 12))  # Reduced from 10 to show more multipliers
             # Always add outline to text for better readability
             text_outline = True
         else:
-            y_offset = 30 * scale_factor
-            text_skip_factor = max(1, int(len(multipliers) / 12))
+            y_offset = 35 * scale_factor  # Increased from 30
+            text_skip_factor = max(1, int(len(multipliers) / 14))  # Reduced from 12 to show more multipliers
             text_outline = True  # Always use text outline for better readability
         
         # Draw the multipliers
@@ -892,20 +892,21 @@ class PlinkoCog(commands.Cog):
         )
 
         # Adjust image aspect ratio if needed to prevent compression/elongation
-        if height > 1000 or width > 1000:
+        if height > 1200 or width > 1500:  # Increased limits for larger images
             # Calculate aspect ratio
             aspect_ratio = width / height
             
             # Determine new dimensions while maintaining aspect ratio
-            if height > width:
-                new_height = min(1000, height)
-                new_width = int(new_height * aspect_ratio)
+            # Prioritize width for better horizontal expansion
+            if aspect_ratio < 1.2:  # If image is too tall relative to width
+                new_width = min(1500, width)  # Allow wider images
+                new_height = int(new_width / max(1.2, aspect_ratio))  # Enforce minimum aspect ratio
             else:
-                new_width = min(1000, width)
+                new_width = min(1500, width)  # Allow wider images
                 new_height = int(new_width / aspect_ratio)
                 
             # Ensure minimum dimensions
-            new_width = max(800, new_width)
+            new_width = max(1000, new_width)  # Increased from 800
             new_height = max(800, new_height)
             
             # Resize the image
