@@ -5,19 +5,10 @@ mongodb = MongoClient(os.environ["MONGO"])
 
 
 class Users:
-    _instance = None
-    _client = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(Users, cls).__new__(cls)
-            cls._client = MongoClient(os.environ["MONGO"])
-        return cls._instance
-
+    
     def __init__(self):
-        if not hasattr(self, 'db'):
-            self.db = self._client["BetSync"]
-            self.collection = self.db["users"]
+        self.db = MongoClient["BetSync"]
+        self.collection = self.db["users"]
 
     def get_all_users(self):
         return self.collection.find()
