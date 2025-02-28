@@ -169,7 +169,7 @@ class Fetches(commands.Cog):
         money = emoji()["money"]
         embed = discord.Embed(title=f"{money} | {user.name}\'s Balance", color=discord.Color.blue(), thumbnail=user.avatar.url)
         embed.add_field(name=":moneybag: Tokens", value=f"```{round(tokens, 2)} Tokens (~${round((tokens * token_value),2)})```")
-        embed.add_field(name=":money_with_wings: Credits", value=f"```{round(credits)} Credits (~${round((credits * token_value), 2)})```")
+        embed.add_field(name=":money_with_wings: Credits", value=f"```{round(credits, 2)} Credits (~${round((credits * token_value), 2)})```")
         embed.set_footer(text="Betsync Casino", icon_url=self.bot.user.avatar.url)
         await ctx.reply(embed=embed)
         
