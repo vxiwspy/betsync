@@ -72,11 +72,11 @@ async def on_ready():
     os.system("clear")
     print(f"{Fore.GREEN}[+] {Fore.WHITE}{bot.user}\n")
     for i in cogs:
-        try:
-            await bot.load_extension(i)
-            print(f"{Fore.GREEN}[+] {Fore.WHITE}Loaded Cog: {Fore.GREEN}{i}{Fore.WHITE}")
-        except Exception as e:
-            print(f"{Fore.RED}[-] {Fore.WHITE}Error loading cog: {e}")
+        #try:
+        bot.load_extension(i)
+        print(f"{Fore.GREEN}[+] {Fore.WHITE}Loaded Cog: {Fore.GREEN}{i}{Fore.WHITE}")
+        #except Exception as e:
+        #print(f"{Fore.RED}[-] {Fore.WHITE}FIX THIS YOU NIGGER {e}")
             
 
 
