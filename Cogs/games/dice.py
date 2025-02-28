@@ -241,10 +241,10 @@ class DiceCog(commands.Cog):
 
         try:
             # Create initial embed with rolling animation
-            rolling_dice = "<a:rollingdice:1328757546345042034>"
+            rolling_dice = "<a:rollingdice:1344966270629576734>"
             initial_embed = discord.Embed(
                 title="🎲 | Dice Game",
-                description=f"{bet_description}\n\n{rolling_dice} Rolling the dice... {rolling_dice}",
+                description=f"{bet_description}\n\n{rolling_dice}",
                 color=0x00FFAE
             )
             initial_embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
@@ -292,8 +292,8 @@ class DiceCog(commands.Cog):
                         f"Your Roll: {user_dice} ({user_roll})\n"
                         f"Dealer Roll: {dealer_dice} ({dealer_roll})\n\n"
                         f"**Multiplier:** {multiplier}x\n"
-                        f"**Winnings:** {winnings} credits\n"
-                        f"**Profit:** {profit} credits"
+                        f"**Winnings:** {round(winnings,2)} credits\n"
+                        f"**Profit:** {round(profit, 2)} credits"
                     ),
                     color=0x00FF00
                 )
