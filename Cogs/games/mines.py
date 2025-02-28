@@ -319,7 +319,7 @@ class MinesTileView(discord.ui.View):
         self.current_multiplier = round(multiplier, 2)
         
         # Ensure minimum is 1.0
-        self.current_multiplier = max(1.0, self.current_multiplier)t_multiplier)
+        self.current_multiplier = max(1.0, self.current_multiplier)t_multiplier
 
     def create_embed(self, status="playing"):
         """Create the game embed based on current state"""
