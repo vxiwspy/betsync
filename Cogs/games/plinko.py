@@ -881,6 +881,11 @@ class PlinkoCog(commands.Cog):
                     outline=ball_color,
                     width=max(2, int(3 * scale_factor))
                 )
+                
+                # Re-draw the text with bright color on top to ensure it's visible
+                # Use a brighter version of the original color for better visibility
+                bright_color = tuple(min(255, c + 50) for c in color[:3]) + (color[3:] if len(color) > 3 else ())
+                draw.text((x, y), multiplier_text, font=multiplier_font, fill=bright_color, anchor="mm")
 
         # Draw the ball at its final position
         final_x, final_y = path[-1]
