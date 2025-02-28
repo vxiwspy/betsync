@@ -244,22 +244,22 @@ class PlinkoCog(commands.Cog):
         # Each list represents the multipliers from left to right
         self.multiplier_templates = {
             8: {
-                "LOW": [6, 2.5, 1.6, 1.2, 0.4, 1.2, 1.6, 2.5, 6],
-                "MEDIUM": [9, 3, 1.5, 0.9, 0.25, 0.9, 1.5, 3, 9],
-                "HIGH": [13, 4, 1.6, 0.8, 0.15, 0.8, 1.6, 4, 13],
-                "EXTREME": [18, 6, 1.5, 0.6, 0.08, 0.6, 1.5, 6, 18]
+                "LOW": [8, 3, 1.8, 1.3, 0.4, 1.3, 1.8, 3, 8],
+                "MEDIUM": [12, 4, 1.8, 1, 0.25, 1, 1.8, 4, 12],
+                "HIGH": [16, 5, 2, 0.9, 0.15, 0.9, 2, 5, 16],
+                "EXTREME": [22, 8, 2, 0.7, 0.08, 0.7, 2, 8, 22]
             },
             12: {
-                "LOW": [12, 4, 2, 1.5, 1.2, 0.8, 0.3, 0.8, 1.2, 1.5, 2, 4, 12],
-                "MEDIUM": [16, 5, 2.5, 1.5, 1, 0.5, 0.15, 0.5, 1, 1.5, 2.5, 5, 16],
-                "HIGH": [24, 8, 3, 1.5, 0.8, 0.3, 0.08, 0.3, 0.8, 1.5, 3, 8, 24],
-                "EXTREME": [40, 15, 5, 1.5, 0.6, 0.15, 0.03, 0.15, 0.6, 1.5, 5, 15, 40]
+                "LOW": [15, 5, 2.5, 1.8, 1.4, 0.9, 0.3, 0.9, 1.4, 1.8, 2.5, 5, 15],
+                "MEDIUM": [20, 7, 3, 1.8, 1.2, 0.6, 0.15, 0.6, 1.2, 1.8, 3, 7, 20],
+                "HIGH": [30, 10, 4, 2, 1, 0.4, 0.08, 0.4, 1, 2, 4, 10, 30],
+                "EXTREME": [50, 18, 7, 2, 0.8, 0.2, 0.03, 0.2, 0.8, 2, 7, 18, 50]
             },
             16: {
-                "LOW": [18, 10, 5, 2.5, 1.8, 1.4, 1.2, 0.8, 0.3, 0.8, 1.2, 1.4, 1.8, 2.5, 5, 10, 18],
-                "MEDIUM": [25, 12, 6, 3, 1.8, 1.2, 0.8, 0.4, 0.15, 0.4, 0.8, 1.2, 1.8, 3, 6, 12, 25],
-                "HIGH": [36, 18, 8, 4, 2, 1, 0.6, 0.25, 0.07, 0.25, 0.6, 1, 2, 4, 8, 18, 36],
-                "EXTREME": [60, 30, 12, 6, 2.5, 1.2, 0.6, 0.15, 0.02, 0.15, 0.6, 1.2, 2.5, 6, 12, 30, 60]
+                "LOW": [22, 12, 6, 3, 2, 1.5, 1.3, 0.9, 0.3, 0.9, 1.3, 1.5, 2, 3, 6, 12, 22],
+                "MEDIUM": [30, 15, 7, 3.5, 2, 1.3, 0.9, 0.4, 0.15, 0.4, 0.9, 1.3, 2, 3.5, 7, 15, 30],
+                "HIGH": [45, 22, 10, 5, 2.5, 1.2, 0.7, 0.25, 0.07, 0.25, 0.7, 1.2, 2.5, 5, 10, 22, 45],
+                "EXTREME": [75, 35, 15, 7, 3, 1.4, 0.7, 0.15, 0.02, 0.15, 0.7, 1.4, 3, 7, 15, 35, 75]
             }
         }
 
@@ -746,9 +746,9 @@ class PlinkoCog(commands.Cog):
         if width < height * 0.9:
             width = int(height * 0.9)
         
-        # Adjust sizes based on scale
-        peg_radius = max(5, int(10 * scale_factor))  # Minimum size of 5 pixels
-        ball_radius = max(8, int(15 * scale_factor))  # Minimum size of 8 pixels
+        # Adjust sizes based on scale - increased sizes for better visibility
+        peg_radius = max(7, int(14 * scale_factor))  # Larger minimum size of 7 pixels
+        ball_radius = max(12, int(20 * scale_factor))  # Larger minimum size of 12 pixels
 
         # Create a new image with dark background
         img = Image.new('RGBA', (width, height), bg_color)
@@ -793,23 +793,23 @@ class PlinkoCog(commands.Cog):
         slot_height = 40 * scale_factor
         slot_y = vertical_spacing + rows * vertical_spacing + 30 * scale_factor  # Below the last row of pegs
 
-        # Determine font size for multipliers based on number of slots
-        # More slots means smaller font to avoid overlap
-        multiplier_font_size = max(12, int(20 * min(1.0, 12 / len(multipliers))))
+        # Determine font size for multipliers - increased sizes for better readability
+        # More slots means smaller font to avoid overlap, but maintain minimum larger size
+        multiplier_font_size = max(16, int(24 * min(1.0, 12 / len(multipliers))))
         multiplier_font = ImageFont.truetype("roboto.ttf", multiplier_font_size)
         
         # For extreme mode with many rows, adjust text spacing and font size
         if rows >= 11:
             # Increase spacing between multipliers
-            y_offset = 30 * scale_factor  # Push text down more to avoid overlap
+            y_offset = 35 * scale_factor  # Push text down more to avoid overlap
             # More aggressive skip factor for text clarity
-            text_skip_factor = max(1, int(len(multipliers) / 12))
-            # Add outline to text for better readability
+            text_skip_factor = max(1, int(len(multipliers) / 11))
+            # Always add outline to text for better readability
             text_outline = True
         else:
-            y_offset = 20 * scale_factor
-            text_skip_factor = max(1, int(len(multipliers) / 15))
-            text_outline = False
+            y_offset = 25 * scale_factor
+            text_skip_factor = max(1, int(len(multipliers) / 14))
+            text_outline = True  # Always use text outline for better readability
         
         # Draw the multipliers
         for i, multiplier in enumerate(multipliers):
@@ -832,9 +832,10 @@ class PlinkoCog(commands.Cog):
             if i % text_skip_factor == 0 or i == landing_position:
                 # Add outline effect for better text readability in extreme mode
                 if text_outline:
-                    # Draw text outline/shadow
-                    outline_color = (0, 0, 0, 180)  # Semi-transparent black
-                    for offset_x, offset_y in [(1,1), (-1,-1), (1,-1), (-1,1)]:
+                    # Draw stronger text outline for better readability
+                    outline_color = (0, 0, 0, 200)  # More opaque black
+                    # More outline positions for a stronger effect
+                    for offset_x, offset_y in [(1,1), (-1,-1), (1,-1), (-1,1), (0,1), (1,0), (-1,0), (0,-1)]:
                         draw.text((x+offset_x, y+offset_y), multiplier_text, font=multiplier_font, fill=outline_color, anchor="mm")
                 
                 draw.text((x, y), multiplier_text, font=multiplier_font, fill=color, anchor="mm")
