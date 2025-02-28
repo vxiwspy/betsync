@@ -255,7 +255,7 @@ class Fetches(commands.Cog):
             
             embed = discord.Embed(
                 title=f":trophy: {scope_text} {currency_type.capitalize()} Leaderboard",
-                description=f"Top users ranked by {currency_type} balance • Page {self.current_page + 1}/{self.total_pages}",
+                description=f"Top users ranked by {currency_type} balance",
                 color=0x00FFAE
             )
             
@@ -282,7 +282,9 @@ class Fetches(commands.Cog):
                     inline=False
                 )
             
-            embed.set_footer(text="BetSync Casino", icon_url=self.all_data.get("bot_avatar", ""))
+            # Add pagination details to footer
+            footer_text = f"BetSync Casino • Page {self.current_page + 1} of {self.total_pages}"
+            embed.set_footer(text=footer_text, icon_url=self.all_data.get("bot_avatar", ""))
             return embed
         
         def create_wagered_embed(self, users_data, start_idx):
@@ -290,7 +292,7 @@ class Fetches(commands.Cog):
             
             embed = discord.Embed(
                 title=f":fire: {scope_text} Wagering Leaderboard",
-                description=f"Top users ranked by total amount wagered • Page {self.current_page + 1}/{self.total_pages}",
+                description=f"Top users ranked by total amount wagered",
                 color=0xFF5500
             )
             
@@ -317,7 +319,9 @@ class Fetches(commands.Cog):
                     inline=False
                 )
             
-            embed.set_footer(text="BetSync Casino", icon_url=self.all_data.get("bot_avatar", ""))
+            # Add pagination details to footer
+            footer_text = f"BetSync Casino • Page {self.current_page + 1} of {self.total_pages}"
+            embed.set_footer(text=footer_text, icon_url=self.all_data.get("bot_avatar", ""))
             return embed
         
         async def on_timeout(self):
