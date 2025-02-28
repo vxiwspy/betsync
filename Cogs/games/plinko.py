@@ -18,8 +18,10 @@ class PlinkoSetupView(discord.ui.View):
         self.bet_amount = bet_amount
         self.difficulty = "LOW"
         self.rows = 12
+        self.balls = 1
         self.add_difficulty_buttons()
         self.add_row_buttons()
+        self.add_ball_buttons()
 
     def add_difficulty_buttons(self):
         difficulties = ["LOW", "MEDIUM", "HIGH", "EXTREME"]
@@ -42,6 +44,18 @@ class PlinkoSetupView(discord.ui.View):
                 row=1 + (i // 3)
             )
             button.callback = self.rows_callback
+            self.add_item(button)
+    
+    def add_ball_buttons(self):
+        balls_options = [1, 2, 3, 4, 5]
+        for i, balls in enumerate(balls_options):
+            button = discord.ui.Button(
+                label=f"{balls} Ball{'s' if balls > 1 else ''}",
+                style=discord.ButtonStyle.primary if balls == 1 else discord.ButtonStyle.secondary,
+                custom_id=f"balls_{balls}",
+                row=4
+            )
+            button.callback = self.balls_callback
             self.add_item(button)
 
         # Add Start button
@@ -87,10 +101,39 @@ class PlinkoSetupView(discord.ui.View):
         # Update embed
         embed = self.create_setup_embed()
         await interaction.response.edit_message(embed=embed, view=self)
+        
+    async def balls_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+
+        # Update selected ball count
+        self.balls = int(interaction.data["custom_id"].split("_")[1])
+
+        # Update button styles
+        for item in self.children:
+            if isinstance(item, discord.ui.Button) and item.custom_id and item.custom_id.startswith("balls_"):
+                balls = int(item.custom_id.split("_")[1])
+                item.style = discord.ButtonStyle.primary if balls == self.balls else discord.ButtonStyle.secondary
+
+        # Update embed
+        embed = self.create_setup_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
 
     async def start_callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
+            
+        # Check if user can afford the total bet
+        db = Users()
+        user_data = db.fetch_user(interaction.user.id)
+        if not user_data:
+            return await interaction.response.send_message("Your account couldn't be found. Please try again later.", ephemeral=True)
+            
+        total_bet = self.bet_amount * self.balls
+        available_funds = user_data['tokens'] + user_data['credits']
+        
+        if available_funds < total_bet:
+            return await interaction.response.send_message(f"You don't have enough funds to bet {total_bet} points ({self.balls} balls at {self.bet_amount} each).", ephemeral=True)
 
         # Disable all buttons to prevent multiple clicks
         for item in self.children:
@@ -103,7 +146,8 @@ class PlinkoSetupView(discord.ui.View):
             self.ctx, 
             self.bet_amount, 
             self.difficulty,
-            self.rows
+            self.rows,
+            self.balls
         )
 
     def create_setup_embed(self):
@@ -112,15 +156,16 @@ class PlinkoSetupView(discord.ui.View):
 
         # Format the multipliers as a string
         multiplier_str = ", ".join([str(m) + "x" for m in multipliers])
-        max_profit = max(multipliers) * self.bet_amount
+        max_profit = max(multipliers) * self.bet_amount * self.balls
+        total_bet = self.bet_amount * self.balls
 
         # Create embed
         embed = discord.Embed(
             title="ℹ️ | Plinko Game",
             description=(
-                f"You are betting {self.bet_amount} points.\n"
-                f"Difficulty: {self.difficulty} | Rows: {self.rows} Rows\n\n"
-                f"Possible Payouts:\n"
+                f"You are betting {self.bet_amount} points per ball ({total_bet} total).\n"
+                f"Difficulty: {self.difficulty} | Rows: {self.rows} | Balls: {self.balls}\n\n"
+                f"Possible Payouts (per ball):\n"
                 f"{multiplier_str}\n"
                 f"Maximum profit: {max_profit} points"
             ),
@@ -130,11 +175,12 @@ class PlinkoSetupView(discord.ui.View):
         return embed
 
 class PlayAgainView(discord.ui.View):
-    def __init__(self, cog, ctx, bet_amount, timeout=15):
+    def __init__(self, cog, ctx, bet_amount, num_balls=1, timeout=15):
         super().__init__(timeout=timeout)
         self.cog = cog
         self.ctx = ctx
         self.bet_amount = bet_amount
+        self.num_balls = num_balls
         self.message = None
 
     @discord.ui.button(label="Play Again", style=discord.ButtonStyle.primary, emoji="🔄")
@@ -155,52 +201,134 @@ class PlayAgainView(discord.ui.View):
         tokens_balance = user_data['tokens']
         credits_balance = user_data['credits']
 
+        # Calculate total bet amount
+        total_bet = self.bet_amount * self.num_balls
+        
         # Determine if the user can make the same bet or needs to use max available
-        if tokens_balance + credits_balance < self.bet_amount:
+        if tokens_balance + credits_balance < total_bet:
             # User doesn't have enough for the same bet - use max instead
-            bet_amount = tokens_balance + credits_balance
-            if bet_amount <= 0:
+            max_bet = tokens_balance + credits_balance
+            if max_bet <= 0:
                 return await interaction.followup.send("You don't have enough funds to play again.", ephemeral=True)
+                
+            # Calculate max number of balls and/or reduced bet per ball
+            max_balls_at_same_bet = max(1, int(max_bet / self.bet_amount))
+            max_bet_per_ball = max_bet / self.num_balls if self.num_balls > 0 else 0
+            
+            options = []
+            
+            # Option 1: Keep same bet amount but reduce balls
+            if max_balls_at_same_bet > 0:
+                options.append({
+                    "description": f"Same bet ({self.bet_amount:.2f}) with {max_balls_at_same_bet} ball{'s' if max_balls_at_same_bet > 1 else ''}",
+                    "bet": self.bet_amount,
+                    "balls": max_balls_at_same_bet
+                })
+                
+            # Option 2: Keep same number of balls but reduce bet per ball
+            if max_bet_per_ball > 0:
+                options.append({
+                    "description": f"Reduced bet ({max_bet_per_ball:.2f} per ball) with {self.num_balls} balls",
+                    "bet": max_bet_per_ball,
+                    "balls": self.num_balls
+                })
+                
+            # Option 3: Always offer max single ball
+            options.append({
+                "description": f"Max bet ({max_bet:.2f}) with 1 ball",
+                "bet": max_bet,
+                "balls": 1
+            })
 
-            # Ask user to confirm playing with max amount
+            # Ask user to confirm playing with alternative options
             confirm_embed = discord.Embed(
                 title="⚠️ Insufficient Funds for Same Bet",
-                description=f"You don't have enough to bet {self.bet_amount:.2f} again.\nWould you like to bet your maximum available amount ({bet_amount:.2f}) instead?",
+                description=f"You don't have enough to bet {total_bet:.2f} again ({self.bet_amount:.2f} × {self.num_balls} balls).\nSelect an option below:",
                 color=0xFFAA00
             )
 
             confirm_view = discord.ui.View(timeout=30)
-
-            @discord.ui.button(label="Yes", style=discord.ButtonStyle.success)
-            async def confirm_button(b, i):
-                if i.user.id != self.ctx.author.id:
-                    return await i.response.send_message("This is not your game!", ephemeral=True)
-
+            
+            # Create buttons for each option
+            for i, option in enumerate(options):
+                button = discord.ui.Button(
+                    label=f"Option {i+1}", 
+                    style=discord.ButtonStyle.primary,
+                    custom_id=f"option_{i}"
+                )
+                
+                async def make_callback(opt):
+                    async def callback(b, interaction):
+                        if interaction.user.id != self.ctx.author.id:
+                            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+                        
+                        for child in confirm_view.children:
+                            child.disabled = True
+                        await interaction.response.edit_message(view=confirm_view)
+                        
+                        # Start a new game with selected option
+                        await interaction.followup.send(f"Starting new game with {opt['bet']:.2f} points × {opt['balls']} ball(s)...", ephemeral=True)
+                        
+                        # Handle the difficulty and rows selection in the new game
+                        if opt['balls'] == 1:
+                            await self.cog.plinko(self.ctx, str(opt['bet']))
+                        else:
+                            # For multiple balls, we need to pass additional parameters
+                            # Start by deducting the bet from the user's account
+                            db = Users()
+                            user_data = db.fetch_user(self.ctx.author.id)
+                            
+                            tokens_balance = user_data['tokens']
+                            credits_balance = user_data['credits']
+                            total_opt_bet = opt['bet'] * opt['balls']
+                            
+                            # Start setup view for the new game with custom params
+                            setup_view = PlinkoSetupView(self.cog, self.ctx, opt['bet'], timeout=60)
+                            setup_view.balls = opt['balls']  # Set the ball count
+                            embed = setup_view.create_setup_embed()
+                            await self.ctx.send(embed=embed, view=setup_view)
+                            
+                    return callback
+                
+                button.callback = await make_callback(option)
+                confirm_view.add_item(button)
+                
+                # Add description field for this option
+                confirm_embed.add_field(
+                    name=f"Option {i+1}", 
+                    value=option["description"], 
+                    inline=False
+                )
+            
+            # Add cancel button
+            cancel_button = discord.ui.Button(label="Cancel", style=discord.ButtonStyle.danger)
+            
+            async def cancel_callback(b, interaction):
+                if interaction.user.id != self.ctx.author.id:
+                    return await interaction.response.send_message("This is not your game!", ephemeral=True)
+                
                 for child in confirm_view.children:
                     child.disabled = True
-                await i.response.edit_message(view=confirm_view)
-
-                # Start a new game with max amount
-                await self.cog.plinko(self.ctx, str(bet_amount))
-
-            @discord.ui.button(label="No", style=discord.ButtonStyle.danger)
-            async def cancel_button(b, i):
-                if i.user.id != self.ctx.author.id:
-                    return await i.response.send_message("This is not your game!", ephemeral=True)
-
-                for child in confirm_view.children:
-                    child.disabled = True
-                await i.response.edit_message(view=confirm_view)
-                await i.followup.send("Plinko game cancelled.", ephemeral=True)
-
-            confirm_view.add_item(confirm_button)
+                await interaction.response.edit_message(view=confirm_view)
+                await interaction.followup.send("Plinko game cancelled.", ephemeral=True)
+                
+            cancel_button.callback = cancel_callback
             confirm_view.add_item(cancel_button)
 
             await interaction.followup.send(embed=confirm_embed, view=confirm_view, ephemeral=True)
         else:
-            # User can afford the same bet
-            await interaction.followup.send("Starting a new game with the same bet...", ephemeral=True)
-            await self.cog.plinko(self.ctx, str(self.bet_amount))
+            # User can afford the same total bet
+            await interaction.followup.send(f"Starting a new game with {self.bet_amount} points × {self.num_balls} ball(s)...", ephemeral=True)
+            
+            if self.num_balls == 1:
+                # Simple case - just one ball
+                await self.cog.plinko(self.ctx, str(self.bet_amount))
+            else:
+                # For multiple balls, start with the setup view but preset the ball count
+                setup_view = PlinkoSetupView(self.cog, self.ctx, self.bet_amount, timeout=60)
+                setup_view.balls = self.num_balls  # Set the ball count
+                embed = setup_view.create_setup_embed()
+                await self.ctx.send(embed=embed, view=setup_view)
 
     async def on_timeout(self):
         # Disable button after timeout
@@ -333,18 +461,18 @@ class PlinkoCog(commands.Cog):
         return result
 
     @commands.command(aliases=["pl"])
-    async def plinko(self, ctx, bet_amount: str = None, difficulty: str = None, rows: int = None):
-        """Play Plinko - watch the ball bounce through pegs to determine your win!"""
+    async def plinko(self, ctx, bet_amount: str = None, difficulty: str = None, rows: int = None, balls: int = None):
+        """Play Plinko - watch balls bounce through pegs to determine your win!"""
         if not bet_amount:
             embed = discord.Embed(
                 title="🎮 How to Play Plinko",
                 description=(
-                    "**Plinko** is a game where a ball drops through a pegboard and lands in a prize slot.\n\n"
-                    "**Usage:** `!plinko <amount> [difficulty] [rows]`\n"
-                    "**Example:** `!plinko 100` or `!plinko 100 low 12`\n\n"
+                    "**Plinko** is a game where balls drop through a pegboard and land in prize slots.\n\n"
+                    "**Usage:** `!plinko <amount> [difficulty] [rows] [balls]`\n"
+                    "**Example:** `!plinko 100` or `!plinko 100 low 12 3`\n\n"
                     "- **Difficulty determines risk vs. reward (LOW, MEDIUM, HIGH, EXTREME)**\n"
                     "- **More rows = more bounces and different multiplier distributions**\n"
-                    "- **The ball bounces unpredictably through the pegs**\n"
+                    "- **Drop up to 5 balls at once for multiple chances to win**\n"
                     "- **Land in high multiplier slots to win big!**\n"
                 ),
                 color=0x00FFAE
@@ -478,26 +606,47 @@ class PlinkoCog(commands.Cog):
         await loading_message.delete()
 
         # If difficulty and rows are provided, start the game directly
-        if difficulty and rows:
+        if difficulty:
             try:
                 difficulty = difficulty.upper()
-                rows = int(rows)
-
+                
                 # Validate difficulty
                 if difficulty not in self.difficulty_settings:
                     difficulty = "LOW"  # Default to LOW if invalid
-
-                # Validate rows (ensure between 8 and 16)
-                rows = max(8, min(16, rows))
-
-                # Start the game
-                await self.start_plinko_game(ctx, total_bet, difficulty, rows)
+                
+                # Parse rows if provided
+                if rows:
+                    rows = int(rows)
+                    # Validate rows (ensure between 8 and 16)
+                    rows = max(8, min(16, rows))
+                else:
+                    rows = 12  # Default
+                
+                # Parse ball count if provided
+                if balls:
+                    balls = int(balls)
+                    # Validate ball count (between 1 and 5)
+                    balls = max(1, min(5, balls))
+                else:
+                    balls = 1  # Default
+                
+                # Check if total bet exceeds available balance
+                if total_bet * balls > tokens_balance + credits_balance:
+                    embed = discord.Embed(
+                        title="<:no:1344252518305234987> | Insufficient Funds",
+                        description=f"You need {total_bet * balls:.2f} points to bet {total_bet:.2f} on {balls} balls.",
+                        color=0xFF0000
+                    )
+                    return await ctx.reply(embed=embed)
+                
+                # Start the game with specified number of balls
+                await self.start_plinko_game(ctx, total_bet, difficulty, rows, balls)
             except Exception as e:
                 print(f"Error starting direct plinko game: {e}")
                 # Fallback to setup view
                 await self.show_setup_view(ctx, total_bet)
         else:
-            # Show the setup view for the user to select difficulty and rows
+            # Show the setup view for the user to select difficulty, rows, and balls
             await self.show_setup_view(ctx, total_bet)
 
     async def show_setup_view(self, ctx, bet_amount):
@@ -506,26 +655,46 @@ class PlinkoCog(commands.Cog):
         embed = setup_view.create_setup_embed()
         await ctx.reply(embed=embed, view=setup_view)
 
-    async def start_plinko_game(self, ctx, bet_amount, difficulty, rows):
+    async def start_plinko_game(self, ctx, bet_amount, difficulty, rows, num_balls=1):
         """Start the actual Plinko game with selected settings"""
         try:
             # Get the multipliers for this difficulty and row count
             multipliers = self.get_multipliers(difficulty, rows)
-
-            # Simulate the ball's path
-            path, landing_position = self.simulate_plinko(rows, difficulty)
-
-            # Get the multiplier at the landing position
-            multiplier = multipliers[landing_position]
-
-            # Calculate winnings
-            winnings = bet_amount * multiplier
-
-            # Generate the Plinko board image
-            plinko_image = self.generate_plinko_image(rows, path, landing_position, multipliers)
+            
+            # Calculate total bet amount
+            total_bet = bet_amount * num_balls
+            
+            # Simulate paths for all balls
+            ball_results = []
+            total_winnings = 0
+            
+            for _ in range(num_balls):
+                # Simulate the ball's path
+                path, landing_position = self.simulate_plinko(rows, difficulty)
+                
+                # Get the multiplier at the landing position
+                multiplier = multipliers[landing_position]
+                
+                # Calculate winnings for this ball
+                ball_winnings = bet_amount * multiplier
+                total_winnings += ball_winnings
+                
+                # Store the ball results
+                ball_results.append({
+                    "path": path,
+                    "landing_position": landing_position,
+                    "multiplier": multiplier,
+                    "winnings": ball_winnings
+                })
+            
+            # Generate the Plinko board image with all balls
+            plinko_image = self.generate_plinko_image(rows, ball_results, multipliers)
+            
+            # Calculate average multiplier
+            avg_multiplier = total_winnings / total_bet if total_bet > 0 else 0
 
             # Create results embed
-            if multiplier >= 1:
+            if total_winnings >= total_bet:
                 result_color = 0x00FF00  # Green for win
                 result_title = "✅ | Plinko Results"
             else:
@@ -538,22 +707,32 @@ class PlinkoCog(commands.Cog):
             img_buffer.seek(0)
             file = discord.File(img_buffer, filename="plinko_result.png")
 
+            # Build detailed ball results
+            ball_details = ""
+            for i, result in enumerate(ball_results):
+                ball_details += f"Ball #{i+1}: {result['multiplier']:.2f}x → {result['winnings']:.2f} points\n"
+            
             # Create embed with results
             result_embed = discord.Embed(
                 title=result_title,
-                description=f"You won {winnings:.2f} points ({multiplier:.2f}x)! 🎉",
+                description=f"You won {total_winnings:.2f} points (Avg: {avg_multiplier:.2f}x)! 🎉",
                 color=result_color
             )
             result_embed.add_field(
-                name="Details", 
-                value=f"Difficulty: {difficulty} - Rows: {rows}\nPlayed by: \"{ctx.author.name}\"",
+                name="Ball Results", 
+                value=ball_details,
+                inline=False
+            )
+            result_embed.add_field(
+                name="Game Details", 
+                value=f"Difficulty: {difficulty} - Rows: {rows} - Balls: {num_balls}\nBet: {bet_amount} per ball (Total: {total_bet})\nPlayed by: \"{ctx.author.name}\"",
                 inline=False
             )
             result_embed.set_image(url="attachment://plinko_result.png")
             result_embed.set_footer(text="BetSync Casino", icon_url=ctx.bot.user.avatar.url)
 
-            # Create a play again view
-            play_again_view = PlayAgainView(self, ctx, bet_amount)
+            # Create a play again view with per-ball bet amount and ball count
+            play_again_view = PlayAgainView(self, ctx, bet_amount, num_balls)
 
             # Send the result
             message = await ctx.reply(embed=result_embed, file=file, view=play_again_view)
@@ -563,17 +742,18 @@ class PlinkoCog(commands.Cog):
             db = Users()
 
             # Process the game outcome
-            if winnings > 0:
+            if total_winnings > 0:
                 # Credit the user with winnings
-                db.update_balance(ctx.author.id, winnings, "credits", "$inc")
+                db.update_balance(ctx.author.id, total_winnings, "credits", "$inc")
 
                 # Add to win history
                 win_entry = {
                     "type": "win",
                     "game": "plinko",
-                    "bet": bet_amount,
-                    "amount": winnings,
-                    "multiplier": multiplier,
+                    "bet": total_bet,
+                    "amount": total_winnings,
+                    "multiplier": avg_multiplier,
+                    "balls": num_balls,
                     "timestamp": int(time.time())
                 }
                 db.collection.update_one(
@@ -591,9 +771,10 @@ class PlinkoCog(commands.Cog):
                         "game": "plinko",
                         "user_id": ctx.author.id,
                         "user_name": ctx.author.name,
-                        "bet": bet_amount,
-                        "amount": winnings,
-                        "multiplier": multiplier,
+                        "bet": total_bet,
+                        "amount": total_winnings,
+                        "multiplier": avg_multiplier,
+                        "balls": num_balls,
                         "timestamp": int(time.time())
                     }
                     server_db.collection.update_one(
@@ -604,24 +785,25 @@ class PlinkoCog(commands.Cog):
                 # Update user stats
                 db.collection.update_one(
                     {"discord_id": ctx.author.id},
-                    {"$inc": {"total_won": 1, "total_earned": winnings}}
+                    {"$inc": {"total_won": 1, "total_earned": total_winnings}}
                 )
 
                 # If user lost money overall, update server profit
-                if winnings < bet_amount:
-                    profit = bet_amount - winnings
+                if total_winnings < total_bet:
+                    profit = total_bet - total_winnings
                     server_db.update_server_profit(ctx.guild.id, profit)
                 else:
                     # User won more than bet, server has a loss
-                    loss = winnings - bet_amount
+                    loss = total_winnings - total_bet
                     server_db.update_server_profit(ctx.guild.id, -loss)
             else:
                 # Add to loss history
                 loss_entry = {
                     "type": "loss",
                     "game": "plinko",
-                    "bet": bet_amount,
-                    "amount": bet_amount,
+                    "bet": total_bet,
+                    "balls": num_balls,
+                    "amount": total_bet,
                     "timestamp": int(time.time())
                 }
                 db.collection.update_one(
@@ -639,7 +821,8 @@ class PlinkoCog(commands.Cog):
                         "game": "plinko",
                         "user_id": ctx.author.id,
                         "user_name": ctx.author.name,
-                        "bet": bet_amount,
+                        "bet": total_bet,
+                        "balls": num_balls,
                         "timestamp": int(time.time())
                     }
                     server_db.collection.update_one(
@@ -648,7 +831,7 @@ class PlinkoCog(commands.Cog):
                     )
 
                     # Update server profit
-                    server_db.update_server_profit(ctx.guild.id, bet_amount)
+                    server_db.update_server_profit(ctx.guild.id, total_bet)
 
                 # Update user stats
                 db.collection.update_one(
@@ -710,13 +893,26 @@ class PlinkoCog(commands.Cog):
 
         return path, landing_position
 
-    def generate_plinko_image(self, rows, path, landing_position, multipliers):
-        """Generate an image of the Plinko board with the ball's path"""
+    def generate_plinko_image(self, rows, ball_results, multipliers):
+        """Generate an image of the Plinko board with multiple balls' paths"""
         # Define colors and sizes
         bg_color = (33, 33, 33)        # Dark background
         peg_color = (200, 200, 200)    # Light gray pegs
-        ball_color = (0, 255, 0)       # Green ball
-        path_color = (0, 200, 0, 128)  # Semi-transparent green path
+        # Different ball and path colors for each ball (up to 5)
+        ball_colors = [
+            (0, 255, 0),      # Green
+            (0, 191, 255),    # Deep Sky Blue
+            (255, 69, 0),     # Red-Orange
+            (255, 215, 0),    # Gold
+            (138, 43, 226)    # Purple
+        ]
+        path_colors = [
+            (0, 200, 0, 128),     # Semi-transparent green
+            (0, 150, 200, 128),   # Semi-transparent blue
+            (200, 60, 0, 128),    # Semi-transparent red-orange
+            (200, 170, 0, 128),   # Semi-transparent gold
+            (100, 30, 170, 128)   # Semi-transparent purple
+        ]
         text_color = (255, 255, 255)   # White text
         multiplier_colors = {
             'high': (255, 50, 50),     # Red for high multipliers
@@ -771,6 +967,29 @@ class PlinkoCog(commands.Cog):
         # Calculate spacing based on rows
         horizontal_spacing = width / (rows + 1)
         vertical_spacing = height / (rows + 3)  # +3 to leave more room for multipliers at bottom
+        
+        # Add win details to top right
+        if len(ball_results) > 0:
+            win_info_font = ImageFont.truetype("roboto.ttf", int(32 * scale_factor))
+            total_win = sum(result["winnings"] for result in ball_results)
+            total_bet = len(ball_results) * (ball_results[0]["winnings"] / ball_results[0]["multiplier"])
+            avg_multiplier = total_win / total_bet if total_bet > 0 else 0
+            
+            win_text = f"Win: {total_win:.2f}"
+            multiplier_text = f"Multiplier: {avg_multiplier:.2f}x"
+            
+            # Position in top right with padding
+            padding = 20 * scale_factor
+            win_text_pos = (width - padding, padding + 15 * scale_factor)
+            mult_text_pos = (width - padding, padding + 55 * scale_factor)
+            
+            # Draw text with shadow for better visibility
+            for pos, text in [(win_text_pos, win_text), (mult_text_pos, multiplier_text)]:
+                # Draw shadow
+                draw.text((pos[0] + 2, pos[1] + 2), text, font=win_info_font, fill=(0, 0, 0), anchor="rt")
+                # Draw text
+                text_color = (0, 255, 0) if total_win >= total_bet else (255, 100, 100)
+                draw.text(pos, text, font=win_info_font, fill=text_color, anchor="rt")
 
         # Draw the pegs
         for row in range(rows + 1):
@@ -778,17 +997,24 @@ class PlinkoCog(commands.Cog):
                 x = (width - row * horizontal_spacing) / 2 + col * horizontal_spacing
                 y = vertical_spacing + row * vertical_spacing
 
-                # Check if this peg is part of the ball's path
-                peg_in_path = False
-                for path_x, path_y in path:
-                    if path_y == row and path_x == col:
-                        peg_in_path = True
-                        break
+                # Check if this peg is part of any ball's path
+                balls_at_peg = []
+                for i, result in enumerate(ball_results):
+                    path = result["path"]
+                    for path_x, path_y in path:
+                        if path_y == row and path_x == col:
+                            balls_at_peg.append(i)
+                            break
 
-                # Draw the peg
-                if peg_in_path:
+                # Draw the ball paths first (behind the peg)
+                for ball_idx in balls_at_peg:
+                    # Ensure we don't go out of bounds with colors
+                    color_idx = ball_idx % len(path_colors)
                     # Draw ball path (slightly larger circle behind the peg)
-                    draw.ellipse((x - ball_radius, y - ball_radius, x + ball_radius, y + ball_radius), fill=path_color)
+                    draw.ellipse(
+                        (x - ball_radius, y - ball_radius, x + ball_radius, y + ball_radius), 
+                        fill=path_colors[color_idx]
+                    )
 
                 # Always draw the peg
                 draw.ellipse((x - peg_radius, y - peg_radius, x + peg_radius, y + peg_radius), fill=peg_color)
@@ -852,8 +1078,14 @@ class PlinkoCog(commands.Cog):
                 bright_color = tuple(min(255, c + 30) for c in color[:3]) + (color[3:] if len(color) > 3 else ())
                 draw.text((x, y), multiplier_text, font=multiplier_font, fill=bright_color, anchor="mm")
 
-            # Highlight the landing slot
-            if i == landing_position:
+            # Check which balls landed in this slot
+            balls_at_slot = []
+            for j, result in enumerate(ball_results):
+                if result["landing_position"] == i:
+                    balls_at_slot.append(j)
+            
+            # Highlight the landing slot if any ball landed here
+            if balls_at_slot:
                 # Draw a more visible rectangle around the winning multiplier
                 padding = 8 * scale_factor
                 text_bbox = draw.textbbox((x, y), multiplier_text, font=multiplier_font, anchor="mm")
@@ -870,31 +1102,102 @@ class PlinkoCog(commands.Cog):
                     outline=None
                 )
                 
-                # Then draw the highlight border with increased thickness
-                draw.rectangle(
-                    (
-                        text_bbox[0] - padding,
-                        text_bbox[1] - padding,
-                        text_bbox[2] + padding,
-                        text_bbox[3] + padding
-                    ),
-                    outline=ball_color,
-                    width=max(2, int(3 * scale_factor))
-                )
+                # If multiple balls landed here, draw a gradient or pattern
+                if len(balls_at_slot) > 1:
+                    # Draw a striped border for multiple balls
+                    stripe_width = max(2, int(3 * scale_factor))
+                    segment_length = (text_bbox[2] - text_bbox[0] + padding * 2) / len(balls_at_slot)
+                    
+                    for k, ball_idx in enumerate(balls_at_slot):
+                        color_idx = ball_idx % len(ball_colors)
+                        # Draw a segment of the border with this ball's color
+                        segment_start = text_bbox[0] - padding + k * segment_length
+                        segment_end = segment_start + segment_length
+                        
+                        # Top border
+                        draw.rectangle(
+                            (
+                                segment_start,
+                                text_bbox[1] - padding,
+                                segment_end,
+                                text_bbox[1] - padding + stripe_width
+                            ),
+                            fill=ball_colors[color_idx]
+                        )
+                        
+                        # Bottom border
+                        draw.rectangle(
+                            (
+                                segment_start,
+                                text_bbox[3] + padding - stripe_width,
+                                segment_end,
+                                text_bbox[3] + padding
+                            ),
+                            fill=ball_colors[color_idx]
+                        )
+                        
+                        # Left border (only for first segment)
+                        if k == 0:
+                            draw.rectangle(
+                                (
+                                    text_bbox[0] - padding,
+                                    text_bbox[1] - padding,
+                                    text_bbox[0] - padding + stripe_width,
+                                    text_bbox[3] + padding
+                                ),
+                                fill=ball_colors[color_idx]
+                            )
+                        
+                        # Right border (only for last segment)
+                        if k == len(balls_at_slot) - 1:
+                            draw.rectangle(
+                                (
+                                    text_bbox[2] + padding - stripe_width,
+                                    text_bbox[1] - padding,
+                                    text_bbox[2] + padding,
+                                    text_bbox[3] + padding
+                                ),
+                                fill=ball_colors[color_idx]
+                            )
+                else:
+                    # Single ball - draw a solid border
+                    ball_idx = balls_at_slot[0]
+                    color_idx = ball_idx % len(ball_colors)
+                    draw.rectangle(
+                        (
+                            text_bbox[0] - padding,
+                            text_bbox[1] - padding,
+                            text_bbox[2] + padding,
+                            text_bbox[3] + padding
+                        ),
+                        outline=ball_colors[color_idx],
+                        width=max(2, int(3 * scale_factor))
+                    )
                 
                 # Re-draw the text with bright color on top to ensure it's visible
                 # Use a brighter version of the original color for better visibility
                 bright_color = tuple(min(255, c + 50) for c in color[:3]) + (color[3:] if len(color) > 3 else ())
                 draw.text((x, y), multiplier_text, font=multiplier_font, fill=bright_color, anchor="mm")
 
-        # Draw the ball at its final position
-        final_x, final_y = path[-1]
-        ball_x = (width - rows * horizontal_spacing) / 2 + final_x * horizontal_spacing
-        ball_y = vertical_spacing + final_y * vertical_spacing
-        draw.ellipse(
-            (ball_x - ball_radius, ball_y - ball_radius, ball_x + ball_radius, ball_y + ball_radius),
-            fill=ball_color
-        )
+        # Draw the balls at their final positions
+        for i, result in enumerate(ball_results):
+            color_idx = i % len(ball_colors)
+            path = result["path"]
+            final_x, final_y = path[-1]
+            ball_x = (width - rows * horizontal_spacing) / 2 + final_x * horizontal_spacing
+            ball_y = vertical_spacing + final_y * vertical_spacing
+            
+            # Draw the ball
+            draw.ellipse(
+                (ball_x - ball_radius, ball_y - ball_radius, ball_x + ball_radius, ball_y + ball_radius),
+                fill=ball_colors[color_idx]
+            )
+            
+            # Add a number to the ball if there are multiple
+            if len(ball_results) > 1:
+                ball_number_font = ImageFont.truetype("roboto.ttf", int(ball_radius * 1.2))
+                ball_number_text = str(i + 1)
+                draw.text((ball_x, ball_y), ball_number_text, font=ball_number_font, fill=(0, 0, 0), anchor="mm")
 
         # Adjust image aspect ratio if needed to prevent compression/elongation
         if height > 1200 or width > 1500:  # Increased limits for larger images
