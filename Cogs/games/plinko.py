@@ -1,20 +1,5 @@
 
 import discord
-from discord.ext import commands
-import random
-import io
-import time
-from PIL import Image, ImageDraw, ImageFont
-import asyncio
-from pathlib import Path
-
-try:
-    from Cogs.utils.db import Users, Servers
-    from Cogs.utils.ui import emoji
-except ImporterError as e:
-    print(f"Error loading imports: {e}")
-
-import discord
 import random
 import asyncio
 import time
@@ -254,9 +239,6 @@ class PlinkoCog(commands.Cog):
                 "variance": 0.25
             }
         }
-        }
-    }
-}
 
         # Multiplier templates for different row counts
         # Each list represents the multipliers from left to right
@@ -368,7 +350,7 @@ class PlinkoCog(commands.Cog):
                 color=0x00FFAE
             )
             embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
-            return await ctx.reply(embed=embed)y(embed=embed)
+            return await ctx.reply(embed=embed)
 
         # Check if the user already has an ongoing game
         if ctx.author.id in self.ongoing_games:
@@ -399,7 +381,7 @@ class PlinkoCog(commands.Cog):
                 description="You don't have an account. Please wait for auto-registration or use `!signup`.",
                 color=0xFF0000
             )
-            return await ctx.reply(embed=embed)y(embed=embed)
+            return await ctx.reply(embed=embed)
 
         # Validate bet amount
         try:
@@ -685,7 +667,7 @@ class PlinkoCog(commands.Cog):
                 description="An error occurred while playing plinko. Please try again later.",
                 color=0xFF0000
             )
-            await ctx.reply(embed=error_embed)send(embed=error_embed)
+            await ctx.send(embed=error_embed)
 
             # Make sure to clean up
             if ctx.author.id in self.ongoing_games:
@@ -726,7 +708,7 @@ class PlinkoCog(commands.Cog):
         # The landing position is the x-coordinate in the final row
         landing_position = path[-1][0]
 
-        return path, landing_position path, landing_position
+        return path, landing_position
 
     def generate_plinko_image(self, rows, path, landing_position, multipliers):
         """Generate an image of the Plinko board with the ball's path"""
@@ -738,122 +720,30 @@ class PlinkoCog(commands.Cog):
         text_color = (255, 255, 255)   # White text
         multiplier_colors = {
             'high': (255, 50, 50),     # Red for high multipliers
-            'medium': (255, 165, 0),   # Orange
+            'medium': (255, 165, 0),   # Orange for medium multipliers
             'low': (255, 255, 0),      # Yellow for low multipliers
             'very_low': (150, 150, 150)  # Gray for very low multipliers
         }
 
-        # Base dimensions
+        # Dimensions
         width = 800
         height = 800
-
-        # Scale elements based on row count to prevent cutting off
-        scale_factor = 1.0
-        if rows >= 11:
-            # Gradually reduce size as rows increase
-            scale_factor = 1.0 - ((rows - 10) * 0.05)
-            scale_factor = max(0.7, scale_factor)  # Don't go below 70% scaling
-
-        # Adjust sizes based on scale factor
-        peg_radius = int(10 * scale_factor)
-        ball_radius = int(15 * scale_factor)
+        peg_radius = 10
+        ball_radius = 15
 
         # Create a new image with dark background
         img = Image.new('RGBA', (width, height), bg_color)
         draw = ImageDraw.Draw(img)
-        
-        # Calculate spacing between pegs
-        horizontal_spacing = width / (rows + 1)
-        vertical_spacing = (height * 0.8) / rows  # Use 80% of height for pegs
-        
-        # Load font for multiplier text
-        try:
-            font = ImageFont.truetype("roboto.ttf", int(24 * scale_factor))
-        except IOError:
-            font = ImageFont.load_default()
-        
-        # Draw the pegs
-        for row in range(rows):
-            for col in range(row + 1):
-                x = (width / 2) + ((col - row / 2) * horizontal_spacing)
-                y = 50 + (row * vertical_spacing)
-                draw.ellipse(
-                    [(x - peg_radius, y - peg_radius), 
-                     (x + peg_radius, y + peg_radius)], 
-                    fill=peg_color
-                )
-        
-        # Draw multiplier slots at the bottom
-        slot_width = horizontal_spacing
-        slot_height = height * 0.15
-        slot_top = height * 0.85
-        
-        for i, multiplier in enumerate(multipliers):
-            # Determine color based on multiplier value
-            if multiplier >= 5:
-                color = multiplier_colors['high']
-            elif multiplier >= 1.5:
-                color = multiplier_colors['medium']
-            elif multiplier >= 0.5:
-                color = multiplier_colors['low']
-            else:
-                color = multiplier_colors['very_low']
-                
-            # Draw the slot
-            slot_left = (width / 2) + ((i - rows / 2) * horizontal_spacing) - (slot_width / 2)
-            draw.rectangle(
-                [(slot_left, slot_top), 
-                 (slot_left + slot_width, slot_top + slot_height)], 
-                fill=color, outline=(255, 255, 255)
-            )
-            
-            # Draw the multiplier text
-            text = f"{multiplier:.2f}x"
-            text_width, text_height = draw.textsize(text, font=font) if hasattr(draw, 'textsize') else font.getsize(text)
-            text_x = slot_left + (slot_width - text_width) / 2
-            text_y = slot_top + (slot_height - text_height) / 2
-            draw.text((text_x, text_y), text, fill=text_color, font=font)
-        
-        # Draw the path of the ball
-        if path:
-            for i in range(1, len(path)):
-                prev_x, prev_y = path[i-1]
-                curr_x, curr_y = path[i]
-                
-                # Convert grid coordinates to pixel coordinates
-                prev_x_pixel = (width / 2) + ((prev_x - prev_y / 2) * horizontal_spacing)
-                prev_y_pixel = 50 + (prev_y * vertical_spacing)
-                curr_x_pixel = (width / 2) + ((curr_x - curr_y / 2) * horizontal_spacing)
-                curr_y_pixel = 50 + (curr_y * vertical_spacing)
-                
-                # Draw line segment
-                draw.line([(prev_x_pixel, prev_y_pixel), (curr_x_pixel, curr_y_pixel)], 
-                          fill=path_color, width=3)
-        
-        # Draw the final position of the ball
-        final_x, final_y = path[-1]
-        ball_x = (width / 2) + ((final_x - final_y / 2) * horizontal_spacing)
-        ball_y = 50 + (final_y * vertical_spacing)
-        draw.ellipse(
-            [(ball_x - ball_radius, ball_y - ball_radius), 
-             (ball_x + ball_radius, ball_y + ball_radius)], 
-            fill=ball_color
-        )
-        
-        return imgw = ImageDraw.Draw(img)
 
-        # Add the "BetSync Plinko" watermark with consistent coloring
-        watermark_font = ImageFont.truetype("roboto.ttf", int(80 * scale_factor))
+        # Add the "BetSync Plinko" watermark
+        watermark_font = ImageFont.truetype("roboto.ttf", 80)
         watermark_text = "BetSync"
-        # Always use white with transparency for watermark
-        watermark_color = (255, 255, 255, 30)
-        draw.text((width//2, height//2), watermark_text, font=watermark_font, fill=watermark_color, anchor="mm")
-        draw.text((width//2, height//2 + int(80 * scale_factor)), "Plinko", font=watermark_font, fill=watermark_color, anchor="mm")
+        draw.text((width//2, height//2), watermark_text, font=watermark_font, fill=(255, 255, 255, 30), anchor="mm")
+        draw.text((width//2, height//2 + 80), "Plinko", font=watermark_font, fill=(255, 255, 255, 30), anchor="mm")
 
         # Calculate spacing based on rows
         horizontal_spacing = width / (rows + 1)
-        # Increase the divisor to create more vertical space for multipliers at bottom
-        vertical_spacing = height / (rows + 2.5)  # +2.5 to leave more room for multipliers
+        vertical_spacing = height / (rows + 2)  # +2 to leave room for multipliers at bottom
 
         # Draw the pegs
         for row in range(rows + 1):
@@ -882,7 +772,7 @@ class PlinkoCog(commands.Cog):
         slot_y = vertical_spacing + rows * vertical_spacing + 30  # Below the last row of pegs
 
         # Draw the multipliers
-        multiplier_font = ImageFont.truetype("roboto.ttf", int(20 * scale_factor))
+        multiplier_font = ImageFont.truetype("roboto.ttf", 20)
         for i, multiplier in enumerate(multipliers):
             # Determine color based on multiplier value
             if multiplier >= 5:
@@ -896,14 +786,14 @@ class PlinkoCog(commands.Cog):
 
             # Draw multiplier text
             x = i * slot_width + slot_width / 2
-            y = slot_y + int(20 * scale_factor)
-            multiplier_text = f"{multiplier:.1f}x" #Reduce decimal places for better readability at smaller scales
+            y = slot_y + 20
+            multiplier_text = f"{multiplier}x"
             draw.text((x, y), multiplier_text, font=multiplier_font, fill=color, anchor="mm")
 
             # Highlight the landing slot
             if i == landing_position:
                 # Draw a rectangle around the winning multiplier
-                padding = int(5 * scale_factor)
+                padding = 5
                 text_bbox = draw.textbbox((x, y), multiplier_text, font=multiplier_font, anchor="mm")
                 draw.rectangle(
                     (
@@ -913,22 +803,17 @@ class PlinkoCog(commands.Cog):
                         text_bbox[3] + padding
                     ),
                     outline=ball_color,
-                    width=int(2 * scale_factor)
+                    width=2
                 )
 
         # Draw the ball at its final position
         final_x, final_y = path[-1]
         ball_x = (width - rows * horizontal_spacing) / 2 + final_x * horizontal_spacing
-        # Position ball centered in the bucket
-        bucket_center_y = vertical_spacing + rows * vertical_spacing + (vertical_spacing * 0.5)
-        ball_y = bucket_center_y - (vertical_spacing * 0.25)  # Position ball slightly above center for better visibility
-
-        # First draw an outline (simple anti-aliasing)
-        draw.ellipse((ball_x - ball_radius - 2, ball_y - ball_radius - 2, 
-                      ball_x + ball_radius + 2, ball_y + ball_radius + 2), fill=(0, 0, 0))
-        # Then draw the actual ball
-        draw.ellipse((ball_x - ball_radius, ball_y - ball_radius, 
-                      ball_x + ball_radius, ball_y + ball_radius), fill=ball_color)
+        ball_y = vertical_spacing + final_y * vertical_spacing
+        draw.ellipse(
+            (ball_x - ball_radius, ball_y - ball_radius, ball_x + ball_radius, ball_y + ball_radius),
+            fill=ball_color
+        )
 
         return img
 
@@ -962,219 +847,4 @@ class PlinkoCog(commands.Cog):
 
 
 def setup(bot):
-    bot.add_cog(PlinkoCog(bot))add_cog(PlinkoCog(bot))
-    def get_multipliers(self, difficulty, rows):
-        """
-        Get the multipliers for a specific difficulty and row count
-        The more rows, the more multipliers
-        """
-        # Base multipliers for each difficulty
-        if difficulty == "LOW":
-            # Low risk, low reward
-            base_multipliers = {
-                "max": 5.0,      # Maximum multiplier
-                "high": 2.0,     # High multiplier
-                "medium": 1.5,   # Medium multiplier
-                "low": 1.0,      # Low multiplier
-                "min": 0.2       # Minimum multiplier
-            }
-        elif difficulty == "MEDIUM":
-            # Medium risk, medium reward
-            base_multipliers = {
-                "max": 10.0,
-                "high": 3.0,
-                "medium": 1.2,
-                "low": 0.7,
-                "min": 0.1
-            }
-        elif difficulty == "HIGH":
-            # High risk, high reward
-            base_multipliers = {
-                "max": 25.0,
-                "high": 5.0,
-                "medium": 1.0,
-                "low": 0.5,
-                "min": 0.0
-            }
-        else:  # EXTREME
-            # Extreme risk, extreme reward
-            base_multipliers = {
-                "max": 50.0,
-                "high": 10.0,
-                "medium": 0.8,
-                "low": 0.3,
-                "min": 0.0
-            }
-        
-        # Generate multipliers based on number of rows (which determines number of landing positions)
-        multipliers = []
-        num_slots = rows + 1  # Number of possible landing positions
-        
-        # Create a distribution that favors middle slots for lower multipliers
-        # and edge slots for higher multipliers
-        for slot in range(num_slots):
-            # Calculate normalized position (0 to 1) from center
-            # 0 = center, 1 = edge
-            center_dist = abs((slot / num_slots) - 0.5) * 2
-            
-            if center_dist < 0.2:  # Center 20%
-                # Lower multipliers in the center
-                mult = base_multipliers["low"] + (center_dist * 5 * (base_multipliers["medium"] - base_multipliers["low"]))
-            elif center_dist < 0.6:  # Middle 40% on each side
-                # Medium multipliers
-                normalized = (center_dist - 0.2) / 0.4
-                mult = base_multipliers["medium"] + (normalized * (base_multipliers["high"] - base_multipliers["medium"]))
-            else:  # Outer 40% (20% on each side)
-                # Higher multipliers at the edges
-                normalized = (center_dist - 0.6) / 0.4
-                mult = base_multipliers["high"] + (normalized * (base_multipliers["max"] - base_multipliers["high"]))
-                
-                # Occasionally set very low multipliers at edges for extreme risk
-                if difficulty in ["HIGH", "EXTREME"] and random.random() < 0.3:
-                    mult = base_multipliers["min"]
-            
-            # Add some randomness to make it less predictable
-            variation = 0.1  # 10% variation
-            mult = mult * (1 + ((random.random() * 2 - 1) * variation))
-            
-            # Round to 2 decimal places
-            mult = round(mult * 100) / 100
-            
-            multipliers.append(mult)
-        
-        return multipliers
-class PlayAgainView(discord.ui.View):
-    def __init__(self, cog, ctx, bet_amount):
-        super().__init__(timeout=60)
-        self.cog = cog
-        self.ctx = ctx
-        self.bet_amount = bet_amount
-        self.message = None
-    
-    @discord.ui.button(label="Play Again", style=discord.ButtonStyle.primary)
-    async def play_again(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Only allow the original player to use this button
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This is not your game!", ephemeral=True)
-        
-        # Disable all buttons to prevent double-clicking
-        for item in self.children:
-            item.disabled = True
-        
-        await interaction.response.edit_message(view=self)
-        
-        # Start a new game with the same bet amount
-        await self.cog.plinko(self.ctx, str(self.bet_amount))
-    
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
-    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Only allow the original player to use this button
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This is not your game!", ephemeral=True)
-        
-        # Disable all buttons
-        for item in self.children:
-            item.disabled = True
-        
-        await interaction.response.edit_message(view=self)
-    
-    async def on_timeout(self):
-        # Disable all buttons when the view times out
-        for item in self.children:
-            item.disabled = True
-        
-        if self.message:
-            try:
-                await self.message.edit(view=self)
-            except discord.HTTPException:
-                pass
-async def difficulty_callback(self, interaction):
-        # Only allow the original user to interact with this view
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This is not your setup!", ephemeral=True)
-        
-        # Update the selected difficulty
-        self.difficulty = interaction.data["custom_id"].split("_")[1]
-        
-        # Update button styles
-        for item in self.children:
-            if item.custom_id and item.custom_id.startswith("difficulty_"):
-                difficulty = item.custom_id.split("_")[1]
-                item.style = discord.ButtonStyle.primary if difficulty == self.difficulty else discord.ButtonStyle.secondary
-        
-        # Update the embed
-        embed = self.create_setup_embed()
-        await interaction.response.edit_message(embed=embed, view=self)
-    
-    async def rows_callback(self, interaction):
-        # Only allow the original user to interact with this view
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This is not your setup!", ephemeral=True)
-        
-        # Update the selected rows
-        self.rows = int(interaction.data["custom_id"].split("_")[1])
-        
-        # Update button styles
-        for item in self.children:
-            if item.custom_id and item.custom_id.startswith("rows_"):
-                rows = int(item.custom_id.split("_")[1])
-                item.style = discord.ButtonStyle.primary if rows == self.rows else discord.ButtonStyle.secondary
-        
-        # Update the embed
-        embed = self.create_setup_embed()
-        await interaction.response.edit_message(embed=embed, view=self)
-    
-    def create_setup_embed(self):
-        """Create the setup embed with current settings"""
-        embed = discord.Embed(
-            title="🎲 Plinko Setup",
-            description=f"**Bet Amount:** {self.bet_amount} points",
-            color=0x00FFAE
-        )
-        
-        embed.add_field(
-            name="Difficulty", 
-            value=f"**{self.difficulty}**\n" + self.get_difficulty_description(self.difficulty),
-            inline=True
-        )
-        
-        embed.add_field(
-            name="Rows", 
-            value=f"**{self.rows}**\n" + self.get_rows_description(self.rows),
-            inline=True
-        )
-        
-        embed.set_footer(text="Select your preferred settings, then press Start!")
-        return embed
-    
-    def get_difficulty_description(self, difficulty):
-        descriptions = {
-            "LOW": "Low risk, low reward (0.2x - 5.0x)",
-            "MEDIUM": "Medium risk, medium reward (0.1x - 10.0x)",
-            "HIGH": "High risk, high reward (0.0x - 25.0x)",
-            "EXTREME": "Extreme risk, extreme reward (0.0x - 50.0x)"
-        }
-        return descriptions.get(difficulty, "")
-    
-    def get_rows_description(self, rows):
-        if rows <= 9:
-            return "Fewer bounces, less variance"
-        elif rows <= 12:
-            return "Balanced bounces and variance"
-        else:
-            return "More bounces, higher variance"
-    
-    @discord.ui.button(label="Start!", style=discord.ButtonStyle.success, row=4)
-    async def start_game(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Only allow the original user to interact with this view
-        if interaction.user.id != self.ctx.author.id:
-            return await interaction.response.send_message("This is not your setup!", ephemeral=True)
-        
-        # Disable all buttons to prevent double-clicking
-        for item in self.children:
-            item.disabled = True
-        
-        await interaction.response.edit_message(view=self)
-        
-        # Start the game with selected settings
-        await self.cog.start_plinko_game(self.ctx, self.bet_amount, self.difficulty, self.rows)
+    bot.add_cog(PlinkoCog(bot))
