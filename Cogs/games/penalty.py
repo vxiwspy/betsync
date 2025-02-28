@@ -57,44 +57,66 @@ class PenaltyButtonView(discord.ui.View):
         self.ctx = ctx
         self.bet_amount = bet_amount
         self.message = None
+        self.clicked = False  # Prevent multiple clicks
 
     @discord.ui.button(label="Left", style=discord.ButtonStyle.primary, emoji="⬅️", custom_id="left")
     async def left_button(self, button, interaction: discord.Interaction):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        if self.clicked:
+            return await interaction.response.send_message("You've already made your shot!", ephemeral=True)
+            
+        self.clicked = True  # Mark that a button has been clicked
 
         # Disable all buttons to prevent multiple clicks
         for child in self.children:
             child.disabled = True
+        
+        # Acknowledge the interaction first
         await interaction.response.edit_message(view=self)
-
-        # Process the shot
+        
+        # Then process the shot
         await self.cog.process_penalty_shot(self.ctx, interaction, "left", self.bet_amount)
 
     @discord.ui.button(label="Middle", style=discord.ButtonStyle.primary, emoji="⬆️", custom_id="middle")
     async def middle_button(self, button, interaction: discord.Interaction):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        if self.clicked:
+            return await interaction.response.send_message("You've already made your shot!", ephemeral=True)
+            
+        self.clicked = True  # Mark that a button has been clicked
 
         # Disable all buttons to prevent multiple clicks
         for child in self.children:
             child.disabled = True
+        
+        # Acknowledge the interaction first
         await interaction.response.edit_message(view=self)
-
-        # Process the shot
+        
+        # Then process the shot
         await self.cog.process_penalty_shot(self.ctx, interaction, "middle", self.bet_amount)
 
     @discord.ui.button(label="Right", style=discord.ButtonStyle.primary, emoji="➡️", custom_id="right")
     async def right_button(self, button, interaction: discord.Interaction):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        if self.clicked:
+            return await interaction.response.send_message("You've already made your shot!", ephemeral=True)
+            
+        self.clicked = True  # Mark that a button has been clicked
 
         # Disable all buttons to prevent multiple clicks
         for child in self.children:
             child.disabled = True
+        
+        # Acknowledge the interaction first
         await interaction.response.edit_message(view=self)
-
-        # Process the shot
+        
+        # Then process the shot
         await self.cog.process_penalty_shot(self.ctx, interaction, "right", self.bet_amount)
 
     async def on_timeout(self):
@@ -249,33 +271,29 @@ class PenaltyCog(commands.Cog):
         if credits_used > 0:
             db.update_balance(ctx.author.id, -credits_used, "credits", "$inc")
 
-        # Create start embed
+        # Create a simpler and cleaner start embed
         embed = discord.Embed(
             title="⚽ PENALTY KICK ⚽",
             description=(
-                f"**Bet:** {bet_amount:,.2f} {currency_type}\n\n"
-                "**Choose where to shoot by clicking one of the buttons below!**\n"
-                "**Win 1.5x your bet if you score!**"
+                f"**Bet:** {bet_amount:,.2f} {currency_type}\n"
+                "**Win 1.5x your bet if you score!**\n\n"
+                "**Choose a direction to shoot:**"
             ),
             color=0x00FFAE
         )
 
-        # Visual representation using emoji - bigger and more clear
+        # Simpler visual representation
         field_value = (
             "```\n"
-            "╔═════════════════════╗\n"
-            "║      ⚽  GOAL  ⚽     ║\n"
-            "╠═════════════════════╣\n"
-            "║                     ║\n"
-            "║     LEFT   MID   RIGHT    ║\n"
-            "║       ↙     ↑     ↘       ║\n"
-            "║                     ║\n"
-            "║          🧤         ║\n"
-            "║     GOALKEEPER      ║\n"
-            "╚═════════════════════╝\n"
+            "       ╔═══════════╗\n"
+            "       ║   GOAL    ║\n"
+            "       ╚═══════════╝\n"
+            "           ⚽  🧤\n"
+            "      ↙      ↑      ↘\n"
+            "    LEFT    MID   RIGHT\n"
             "```"
         )
-        embed.add_field(name="Choose Your Shot Direction", value=field_value, inline=False)
+        embed.add_field(name="⬇️ Choose a button below ⬇️", value=field_value, inline=False)
         embed.set_footer(text="BetSync Casino | Click a button to shoot!", icon_url=self.bot.user.avatar.url)
 
         # Delete loading message
@@ -320,8 +338,11 @@ class PenaltyCog(commands.Cog):
             db = Users()
             db.update_balance(ctx.author.id, winnings, "credits", "$inc")
 
-            # Update statistics
-            db.update_game_statistics(ctx.author.id, bet_amount, winnings, True)
+            # Update statistics - instead of using update_game_statistics method
+            db.collection.update_one(
+                {"discord_id": ctx.author.id},
+                {"$inc": {"total_played": 1, "total_won": 1, "total_earned": winnings}}
+            )
 
             # Create ASCII art for goal
             if shot_direction == "left":
@@ -357,9 +378,12 @@ class PenaltyCog(commands.Cog):
             description = f"You shot **{shot_direction.upper()}**, the goalkeeper dove **{goalkeeper_direction.upper()}**.\n\n**You lost {bet_amount:,.2f} credits.**"
             color = 0xFF0000  # Red for loss
 
-            # Update statistics
+            # Update statistics - instead of using update_game_statistics method
             db = Users()
-            db.update_game_statistics(ctx.author.id, bet_amount, 0, False)
+            db.collection.update_one(
+                {"discord_id": ctx.author.id},
+                {"$inc": {"total_played": 1, "total_lost": 1, "total_spent": bet_amount}}
+            )
 
             # Create ASCII art for save
             result_ascii = (
@@ -387,15 +411,15 @@ class PenaltyCog(commands.Cog):
 
         # Add betting history
         server_db = Servers()
-        used_currency = "tokens" if tokens_used > 0 else "credits"
-        bet_amount_used = tokens_used if tokens_used > 0 else credits_used
+        # Get the pending game data to determine which currency was used
+        game_info = self.ongoing_games.get(ctx.author.id, {})
         
         game_data = {
             "game": "penalty",
             "user_id": ctx.author.id,
             "user_name": str(ctx.author),
-            "bet_amount": bet_amount_used,
-            "currency_type": used_currency,
+            "bet_amount": bet_amount,
+            "currency_type": "credits",  # Always record payouts in credits
             "multiplier": multiplier if goal_scored else 0,
             "winnings": winnings,
             "choice": shot_direction,
