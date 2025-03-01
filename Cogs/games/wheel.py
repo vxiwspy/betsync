@@ -13,11 +13,11 @@ class WheelCog(commands.Cog):
         self.ongoing_games = {}
         # Define color multipliers
         self.colors = {
-            "gray": {"emoji": "⚪", "multiplier": 0, "chance": 15},
-            "yellow": {"emoji": "🟡", "multiplier": 1.5, "chance": 30},
-            "red": {"emoji": "🔴", "multiplier": 2, "chance": 25},
-            "blue": {"emoji": "🔵", "multiplier": 3, "chance": 20},
-            "green": {"emoji": "🟢", "multiplier": 5, "chance": 10}
+            "gray": {"emoji": "⚪", "multiplier": 0, "chance": 50},
+            "yellow": {"emoji": "🟡", "multiplier": 1.5, "chance": 25},
+            "red": {"emoji": "🔴", "multiplier": 2, "chance": 15},
+            "blue": {"emoji": "🔵", "multiplier": 3, "chance": 7},
+            "green": {"emoji": "🟢", "multiplier": 5, "chance": 3}
         }
         # Calculate total chance to verify it sums to 100
         self.total_chance = sum(color["chance"] for color in self.colors.values())
@@ -275,7 +275,7 @@ class WheelCog(commands.Cog):
         ]
         
         # Animate the wheel spinning - 20 frames × 0.1s = 2 seconds total
-        for _ in range(2):  # Reduced to 2 cycles
+        for _ in range(1):  # Reduced to 2 cycles
             for frame in spinning_frames:
                 wheel_embed.set_field_at(
                     1,  # Index 1 is the "Wheel Spinning" field
@@ -284,7 +284,7 @@ class WheelCog(commands.Cog):
                     inline=False
                 )
                 await wheel_message.edit(embed=wheel_embed)
-                await asyncio.sleep(0.1)  # Exactly 20 frames × 0.1s = 2 seconds total
+                await asyncio.sleep(0.004)  # Exactly 20 frames × 0.1s = 2 seconds total
 
         # Calculate result with house edge (3-5%)
         # Implement a small house edge by slightly adjusting the chances
