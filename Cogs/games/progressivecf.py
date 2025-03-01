@@ -7,7 +7,7 @@ from Cogs.utils.mongo import Users, Servers
 from Cogs.utils.emojis import emoji
 
 class PCFView(discord.ui.View):
-    def __init__(self, cog, ctx, message, bet_amount, currency_used, initial_multiplier=1.96, timeout=30):
+    def __init__(self, cog, ctx, message, bet_amount, currency_used, initial_multiplier=1, timeout=30):
         super().__init__(timeout=timeout)
         self.cog = cog
         self.ctx = ctx
