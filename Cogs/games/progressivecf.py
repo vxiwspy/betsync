@@ -78,7 +78,8 @@ class ContinueOrCashoutView(discord.ui.View):
         self.choice = "heads"
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(view=self)
+        await interaction.response.defer()
+        await self.message.edit(view=self)
 
         # Continue flipping with heads
         await self.cog.continue_progressive_flips(
@@ -100,7 +101,8 @@ class ContinueOrCashoutView(discord.ui.View):
         self.choice = "tails"
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(view=self)
+        await interaction.response.defer()
+        await self.message.edit(view=self)
 
         # Continue flipping with tails
         await self.cog.continue_progressive_flips(
@@ -119,9 +121,15 @@ class ContinueOrCashoutView(discord.ui.View):
         if interaction.user.id != self.ctx.author.id:
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
 
+        # Verify user can cash out (at least one flip made)
+        if self.current_flips == 0:
+            await interaction.response.send_message("You need to flip at least once before cashing out!", ephemeral=True)
+            return
+
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(view=self)
+        await interaction.response.defer()
+        await self.message.edit(view=self)
 
         # Process cashout
         await self.cog.process_cashout(self.ctx, interaction, self.message, 
@@ -424,7 +432,7 @@ class ProgressiveCoinflipCog(commands.Cog):
         """Start the progressive coinflip game after the user selects a side"""
 
         # Initial multiplier
-        initial_multiplier = 1.96ultiplier = 1.96
+        initial_multiplier = 1.96
 
         # Create animated coinflip
         try:
