@@ -78,6 +78,19 @@ class WheelCog(commands.Cog):
                 color=0xFF0000
             )
             return await ctx.reply(embed=embed)
+            
+        # Auto-select currency if not specified
+        if currency_type is None:
+            tokens_balance = user_data['tokens']
+            credits_balance = user_data['credits']
+            
+            # Use currency with higher balance, or tokens if equal
+            if tokens_balance >= credits_balance and tokens_balance > 0:
+                currency_type = "tokens"
+            elif credits_balance > 0:
+                currency_type = "credits"
+            else:
+                currency_type = "tokens"  # Default to tokens if both are 0 await ctx.reply(embed=embed)
 
         # Process bet amount
         try:
@@ -247,7 +260,7 @@ class WheelCog(commands.Cog):
         # Send the initial wheel embed
         wheel_message = await ctx.reply(embed=wheel_embed)
         
-        # Create spinning animation
+        # Create spinning animation - reduced to about 2 seconds total
         spinning_frames = [
             "⚙️ " + "⬛" * 4 + "🟡" + "⬛" * 5 + " ⚙️",
             "⚙️ " + "⬛" * 5 + "🔴" + "⬛" * 4 + " ⚙️",
@@ -271,7 +284,7 @@ class WheelCog(commands.Cog):
                     inline=False
                 )
                 await wheel_message.edit(embed=wheel_embed)
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.1)  # Reduced to make the animation faster
 
         # Calculate result with house edge (3-5%)
         # Implement a small house edge by slightly adjusting the chances
