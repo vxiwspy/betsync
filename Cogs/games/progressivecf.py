@@ -339,7 +339,7 @@ class ProgressiveCoinflipCog(commands.Cog):
         self.ongoing_games = {}
 
     @commands.command(aliases=["pcf", "progressive", "progressiveflip", "progcoin"])
-    async def pcf(self, ctx, bet_amount: str = None, currency_type: str = None, side: str = None):
+    async def progressivecoinflip(self, ctx, bet_amount: str = None, currency_type: str = None, side: str = None):
         """Progressive Coinflip - keep winning to multiply your profits!"""
         
         # Show usage if no bet amount provided
