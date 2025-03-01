@@ -604,10 +604,18 @@ class ProgressiveCoinflipCog(commands.Cog):
                 del self.ongoing_games[ctx.author.id]
 
     async def process_cashout(self, ctx, interaction, message, bet_amount, currency_used, flips, multiplier, auto_cashout=False):
-        """Process cashout from progressive coinflip"""
+        """Process cashout for the player"""
+        # Calculate winnings (only credits)
+        winnings = bet_amount * multiplier
 
-        # Calculate winnings
-        winnings = round(bet_amount * multiplier, 2)
+        # Add proper interaction check
+        responded = False
+        if interaction:
+            try:
+                # Check if response is already done
+                await interaction.response.defer()
+            except discord.errors.InteractionResponded:
+                responded = True
 
         # Create cashout embed
         cashout_embed = discord.Embed(
@@ -627,10 +635,13 @@ class ProgressiveCoinflipCog(commands.Cog):
         cashout_embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
 
         # Update message
-        if interaction:
+        if interaction and not responded:
             await interaction.response.edit_message(embed=cashout_embed, view=None)
-        else:
+        elif not interaction:
             await message.edit(embed=cashout_embed, view=None)
+        else:
+            await ctx.send(embed=cashout_embed)
+
 
         # Process win
         await self.process_win(ctx, bet_amount, multiplier, flips)
