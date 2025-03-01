@@ -6,6 +6,36 @@ from discord.ext import commands
 from Cogs.utils.mongo import Users, Servers
 from Cogs.utils.emojis import emoji
 
+class PlayAgainView(discord.ui.View):
+    def __init__(self, cog, ctx, bet_amount, currency_used, timeout=60):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.ctx = ctx
+        self.bet_amount = bet_amount
+        self.currency_used = currency_used
+        self.message = None
+
+    @discord.ui.button(label="Play Again", style=discord.ButtonStyle.success, emoji="🔄")
+    async def play_again_button(self, button, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+        
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+        
+        # Start a new game with the same bet
+        await self.cog.progressivecf(self.ctx, str(self.bet_amount), self.currency_used)
+    
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await self.message.edit(view=self)
+        except:
+            pass
+
+
 class PCFView(discord.ui.View):
     def __init__(self, cog, ctx, message, bet_amount, currency_used, initial_multiplier=1, timeout=30):
         super().__init__(timeout=timeout)
@@ -34,7 +64,7 @@ class PCFView(discord.ui.View):
             return await interaction.response.send_message("This is not your game!", ephemeral=True)
 
         self.choice = "tails"
-        await self.flip_coin(interaction)
+        await self.flip_coin(interactionction)
 
     @discord.ui.button(label="CASH OUT", style=discord.ButtonStyle.success, emoji="💰")
     async def cashout_button(self, button, interaction):
@@ -855,6 +885,8 @@ class ProgressiveCoinflipCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.ongoing_games = {}
+        self.bot = bot
+        self.ongoing_games = {}
 
     @commands.command(aliases=["pcf"])
     async def progressivecf(self, ctx, bet_amount: str = None, currency_type: str = None):
@@ -1610,6 +1642,300 @@ class PlayAgainView(discord.ui.View):
             await self.message.edit(view=self)
         except:
             pass
+
+
+def setup(bot):
+    bot.add_cog(ProgressiveCoinflipCog(bot))
+    async def flip_coin(self, interaction):
+        await interaction.response.defer()
+        
+        # Determine result
+        result = random.choice(["heads", "tails"])
+        self.last_result = result
+        self.current_flips += 1
+        
+        # Calculate multiplier for each win
+        win_multiplier = 1.96
+        potential_next_multiplier = round(self.current_multiplier * win_multiplier, 2)
+        
+        # Format coin history display
+        coin_icons = ""
+        for i in range(self.current_flips):
+            if i == self.current_flips - 1:  # Current flip
+                if result == "heads":
+                    coin_icons += "🟡 "  # Yellow circle for heads
+                else:
+                    coin_icons += "🟠 "  # Orange circle for tails
+            else:
+                coin_icons += "⚪ "  # White circle for previous flips
+        
+        # Add placeholder circles for remaining flips
+        remaining_flips = self.max_flips - self.current_flips
+        coin_icons += "⬜ " * min(remaining_flips, 5)  # Show max 5 placeholder slots
+        
+        # Game outcome
+        if result == self.choice:  # Win
+            # Update multiplier for win
+            self.current_multiplier = potential_next_multiplier
+            
+            # Calculate current winnings
+            winnings = round(self.bet_amount * self.current_multiplier)
+            
+            # Create embed with red side bar and win message
+            embed = discord.Embed(
+                title="❌ | Progressive Coinflip",
+                description=f"Bet: {self.bet_amount} {self.currency_used}\nWinnings: {winnings} ({self.current_multiplier}x)",
+                color=0xED4245  # Discord red color
+            )
+            
+            # Add coin history display
+            embed.add_field(name="", value=coin_icons, inline=False)
+            
+            # Add outcome message
+            embed.add_field(
+                name="", 
+                value=f"You chose: **{self.choice.capitalize()}**. The coin landed on: **{result.capitalize()}**\nYou won this round! Continue or cash out?",
+                inline=False
+            )
+            
+            # Update buttons for next round
+            for child in self.children:
+                if child.label in ["HEADS", "TAILS"]:
+                    child.style = discord.ButtonStyle.primary
+            
+            # Update cash out button with current winnings
+            cash_out_button = [x for x in self.children if x.label == "CASH OUT"][0]
+            cash_out_button.label = f"CASH OUT ({winnings})"
+            
+            await self.message.edit(embed=embed, view=self)
+            
+        else:  # Loss
+            # Create embed with red side bar and loss message
+            embed = discord.Embed(
+                title="❌ | Progressive Coinflip",
+                description=f"Bet: {self.bet_amount} {self.currency_used}\nWinnings: 0 ({self.current_multiplier}x)",
+                color=0xED4245  # Discord red color
+            )
+            
+            # Add coin history display
+            embed.add_field(name="", value=coin_icons, inline=False)
+            
+            # Add outcome message
+            embed.add_field(
+                name="", 
+                value=f"You chose: **{self.choice.capitalize()}**. The coin landed on: **{result.capitalize()}**\nYou lost this round. Better luck next time!",
+                inline=False
+            )
+            
+            # Add BetRush branding
+            embed.set_footer(text="BetRush")
+            
+            # Disable all buttons
+            for child in self.children:
+                child.disabled = True
+                
+            await self.message.edit(embed=embed, view=self)
+            
+            # Show play again button
+            play_again_view = PlayAgainView(self.cog, self.ctx, self.bet_amount, self.currency_used)
+            play_again_view.message = self.message
+            await self.message.edit(view=play_again_view)
+            
+            # Remove from ongoing games
+            if self.ctx.author.id in self.cog.ongoing_games:
+                del self.cog.ongoing_games[self.ctx.author.id]
+
+    @discord.ui.button(label="CASH OUT", style=discord.ButtonStyle.success)
+    async def cash_out_button(self, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+            
+        if self.current_flips == 0:
+            return await interaction.response.send_message("You need to play at least one round before cashing out!", ephemeral=True)
+            
+        await interaction.response.defer()
+        
+        # Calculate winnings
+        winnings = round(self.bet_amount * self.current_multiplier)
+        
+        # Create embed for cash out
+        embed = discord.Embed(
+            title="💰 | Progressive Coinflip - Cash Out",
+            description=f"Bet: {self.bet_amount} {self.currency_used}\nWinnings: {winnings} ({self.current_multiplier}x)",
+            color=0x57F287  # Discord green color
+        )
+        
+        # Add outcome message
+        embed.add_field(
+            name="", 
+            value=f"You cashed out after {self.current_flips} {'flip' if self.current_flips == 1 else 'flips'}!\nYou won **{winnings}** credits!",
+            inline=False
+        )
+        
+        # Add BetRush branding
+        embed.set_footer(text="BetRush")
+        
+        # Disable all buttons
+        for child in self.children:
+            child.disabled = True
+            
+        await self.message.edit(embed=embed, view=self)
+        
+        # Give the user their winnings
+        db = Users()
+        db.update_credits(self.ctx.author.id, winnings)
+        
+        # Show play again button
+        play_again_view = PlayAgainView(self.cog, self.ctx, self.bet_amount, self.currency_used)
+        play_again_view.message = self.message
+        await self.message.edit(view=play_again_view)
+        
+        # Remove from ongoing games
+        if self.ctx.author.id in self.cog.ongoing_games:
+            del self.cog.ongoing_games[self.ctx.author.id]
+@commands.command(aliases=["pcf"])
+    async def progressivecf(self, ctx, bet_amount: str = None, currency_type: str = None):
+        """Play progressive coinflip - win multiple times to increase your multiplier!"""
+        if not bet_amount:
+            embed = discord.Embed(
+                title="🪙 How to Play Progressive Coinflip",
+                description=(
+                    "**Progressive Coinflip** is a game where you can win multiple times in a row for increasing rewards.\n\n"
+                    "**Usage:** `!progressivecf <amount> [currency]`\n"
+                    "**Example:** `!progressivecf 100` or `!progressivecf 100 tokens`\n\n"
+                    "**How to Play:**\n"
+                    "1. Choose heads or tails for each flip\n"
+                    "2. Each correct guess multiplies your winnings by 1.96x\n"
+                    "3. You can cash out anytime or continue flipping\n"
+                    "4. Maximum 15 flips allowed\n"
+                    "5. If you lose a flip, you get nothing\n\n"
+                    "**Currency Options:**\n"
+                    "- You can bet using tokens (T) or credits (C)\n"
+                    "- Winnings are always paid in credits"
+                ),
+                color=0x00FFAE
+            )
+            embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
+            return await ctx.reply(embed=embed)
+
+        # Check if the user already has an ongoing game
+        if ctx.author.id in self.ongoing_games:
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Game In Progress",
+                description="You already have an ongoing game. Please finish it first.",
+                color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+
+        # Send loading message
+        loading_emoji = "⌛" # You may need to replace this with your actual loading emoji function
+        loading_embed = discord.Embed(
+            title=f"{loading_emoji} | Preparing Progressive Coinflip Game...",
+            description="Please wait while we set up your game.",
+            color=0x00FFAE
+        )
+        loading_message = await ctx.reply(embed=loading_embed)
+
+        # Process bet amount
+        db = Users() # You'll need to make sure this class is imported
+        user_data = db.fetch_user(ctx.author.id)
+
+        if user_data == False:
+            await loading_message.delete()
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | User Not Found",
+                description="You don't have an account. Please wait for auto-registration or use `!signup`.",
+                color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+
+        # Default to credits if no currency specified
+        currency_used = "credits"
+        if currency_type:
+            if currency_type.lower() in ["t", "token", "tokens"]:
+                currency_used = "tokens"
+
+        # Process the bet amount (handle "all", "half", etc.)
+        try:
+            if bet_amount.lower() == "all":
+                if currency_used == "credits":
+                    bet_amount = user_data["credits"]
+                else:
+                    bet_amount = user_data["tokens"]
+            elif bet_amount.lower() == "half":
+                if currency_used == "credits":
+                    bet_amount = user_data["credits"] // 2
+                else:
+                    bet_amount = user_data["tokens"] // 2
+            else:
+                bet_amount = int(bet_amount)
+        except ValueError:
+            await loading_message.delete()
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Invalid Amount",
+                description="Please enter a valid bet amount.",
+                color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+
+        # Check if bet amount is valid
+        if bet_amount <= 0:
+            await loading_message.delete()
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Invalid Amount",
+                description="Bet amount must be greater than 0.",
+                color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+
+        # Check if user has enough balance
+        if currency_used == "credits" and bet_amount > user_data["credits"]:
+            await loading_message.delete()
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Insufficient Credits",
+                description=f"You don't have enough credits. You have {user_data['credits']} credits.",
+                color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+        elif currency_used == "tokens" and bet_amount > user_data["tokens"]:
+            await loading_message.delete()
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Insufficient Tokens",
+                description=f"You don't have enough tokens. You have {user_data['tokens']} tokens.",
+                color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+
+        # Deduct the bet amount
+        if currency_used == "credits":
+            db.update_credits(ctx.author.id, -bet_amount)
+        else:
+            db.update_tokens(ctx.author.id, -bet_amount)
+
+        # Create the initial game embed with red sidebar
+        game_embed = discord.Embed(
+            title="❌ | Progressive Coinflip",
+            description=f"Bet: {bet_amount} {currency_used}\nWinnings: 0 (1.0x)",
+            color=0xED4245  # Discord red color
+        )
+        
+        # Add empty history and instruction
+        game_embed.add_field(name="", value="⬜ ⬜ ⬜ ⬜ ⬜", inline=False)
+        game_embed.add_field(name="", value="Choose heads or tails to start the game!", inline=False)
+        
+        # Add BetRush branding
+        game_embed.set_footer(text="BetRush")
+
+        # Send the game message and view
+        await loading_message.delete()
+        game_message = await ctx.reply(embed=game_embed)
+        
+        # Create the game view
+        game_view = PCFView(self, ctx, game_message, bet_amount, currency_used)
+        await game_message.edit(view=game_view)
+        
+        # Mark user as having an ongoing game
+        self.ongoing_games[ctx.author.id] = game_message.id
 
 
 def setup(bot):
