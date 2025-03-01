@@ -260,7 +260,7 @@ class WheelCog(commands.Cog):
         # Send the initial wheel embed
         wheel_message = await ctx.reply(embed=wheel_embed)
         
-        # Create spinning animation - reduced to about 2 seconds total
+        # Create spinning animation - reduced to exactly 2 seconds total
         spinning_frames = [
             "⚙️ " + "⬛" * 4 + "🟡" + "⬛" * 5 + " ⚙️",
             "⚙️ " + "⬛" * 5 + "🔴" + "⬛" * 4 + " ⚙️",
@@ -274,8 +274,8 @@ class WheelCog(commands.Cog):
             "⚙️ " + "⬛" * 3 + "⚪" + "⬛" * 6 + " ⚙️"
         ]
         
-        # Animate the wheel spinning
-        for _ in range(3):  # 3 cycles of animation
+        # Animate the wheel spinning - 20 frames × 0.1s = 2 seconds total
+        for _ in range(2):  # Reduced to 2 cycles
             for frame in spinning_frames:
                 wheel_embed.set_field_at(
                     1,  # Index 1 is the "Wheel Spinning" field
@@ -284,7 +284,7 @@ class WheelCog(commands.Cog):
                     inline=False
                 )
                 await wheel_message.edit(embed=wheel_embed)
-                await asyncio.sleep(0.1)  # Reduced to make the animation faster
+                await asyncio.sleep(0.1)  # Exactly 20 frames × 0.1s = 2 seconds total
 
         # Calculate result with house edge (3-5%)
         # Implement a small house edge by slightly adjusting the chances
