@@ -104,22 +104,10 @@ class PCFView(discord.ui.View):
             # Player lost
             # Create losing embed
             embed = discord.Embed(
-                title="❌ | Progressive Coinflip",
-                description=f"**Bet:** {self.bet_amount} {'tokens' if self.currency_used == 'tokens' else 'credits'}\n**Winnings:** 0 ({self.current_multiplier:.2f}x)\n\n",
+                title="🪙 | Progressive Coinflip - GAME OVER!",
+                description=f"You flipped **{result.upper()}** and chose **{self.choice.upper()}**\n\n**YOU LOSE!**\n\nCurrent Flips: **{self.current_flips}/{self.max_flips}**\nMultiplier: **{self.current_multiplier:.2f}x**",
                 color=0xFF0000
             )
-
-            # Add coin visualization
-            coins_display = ""
-            for i in range(min(6, self.current_flips + 1)):
-                if i < self.current_flips:
-                    coins_display += "🟡 "
-                else:
-                    coins_display += "⬜ "
-
-            embed.description += coins_display + "\n\n"
-            embed.description += f"You chose: **{self.choice.capitalize()}**. The coin landed on: **{result.capitalize()}**\nYou lost this round. Better luck next time!"
-
             # Update embed footer
             embed.set_footer(text="BetSync Casino", icon_url=self.ctx.bot.user.avatar.url)
 
@@ -129,7 +117,7 @@ class PCFView(discord.ui.View):
 
             # Update the message
             await interaction.response.edit_message(embed=embed, view=self)
-
+            
             # Add play again button
             play_again_view = PlayAgainView(self.cog, self.ctx, self.bet_amount, self.currency_used)
             await interaction.message.edit(view=play_again_view)
@@ -250,46 +238,46 @@ class PlayAgainView(discord.ui.View):
                 description=f"You don't have enough funds for the same bet amount. Would you like to bet all your remaining funds ({total_balance:.2f})?",
                 color=discord.Color.yellow()
             )
-
+            
             confirm_view = discord.ui.View(timeout=30)
-
+            
             @discord.ui.button(label="Yes", style=discord.ButtonStyle.success)
             async def confirm_button(b, i):
                 if i.user.id != self.ctx.author.id:
                     return await i.response.send_message("This is not your game!", ephemeral=True)
-
+                
                 for child in confirm_view.children:
                     child.disabled = True
                 await i.response.edit_message(view=confirm_view)
                 await i.followup.send("Starting a new game with adjusted bet...", ephemeral=True)
-
+                
                 # Start a new game with the max bet amount
                 await self.cog.progressivecf(self.ctx, str(total_balance), self.currency_used)
-
+            
             @discord.ui.button(label="No", style=discord.ButtonStyle.danger)
             async def cancel_button(b, i):
                 if i.user.id != self.ctx.author.id:
                     return await i.response.send_message("This is not your game!", ephemeral=True)
-
+                
                 for child in confirm_view.children:
                     child.disabled = True
                 await i.response.edit_message(view=confirm_view)
                 await i.followup.send("Progressive Coinflip cancelled.", ephemeral=True)
-
+            
             confirm_view.add_item(confirm_button)
             confirm_view.add_item(cancel_button)
-
+            
             await interaction.followup.send(embed=confirm_embed, view=confirm_view, ephemeral=True)
         else:
             # User can afford the same bet
             await interaction.followup.send("Starting a new game with the same bet...", ephemeral=True)
             await self.cog.progressivecf(self.ctx, str(self.bet_amount), self.currency_used)
-
+    
     async def on_timeout(self):
         # Disable button after timeout
         for item in self.children:
             item.disabled = True
-
+        
         try:
             await self.message.edit(view=self)
         except:
