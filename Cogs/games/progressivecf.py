@@ -81,10 +81,16 @@ class ContinueOrCashoutView(discord.ui.View):
         await interaction.response.edit_message(view=self)
 
         # Continue flipping with heads
-        await self.cog.continue_progressive_flips(self.ctx, interaction, self.message, 
-                                                 self.bet_amount, self.currency_used, 
-                                                 "heads", self.current_flips, 
-                                                 self.current_multiplier)
+        await self.cog.continue_progressive_flips(
+            self.ctx, 
+            interaction, 
+            self.message, 
+            self.bet_amount, 
+            self.currency_used, 
+            "heads", 
+            self.current_flips, 
+            self.current_multiplier
+        )
 
     @discord.ui.button(label="Tails", style=discord.ButtonStyle.primary, emoji="<:tails:1344974822009999451>")
     async def tails_button(self, button, interaction):
@@ -97,10 +103,16 @@ class ContinueOrCashoutView(discord.ui.View):
         await interaction.response.edit_message(view=self)
 
         # Continue flipping with tails
-        await self.cog.continue_progressive_flips(self.ctx, interaction, self.message, 
-                                                 self.bet_amount, self.currency_used, 
-                                                 "tails", self.current_flips, 
-                                                 self.current_multiplier)
+        await self.cog.continue_progressive_flips(
+            self.ctx, 
+            interaction, 
+            self.message, 
+            self.bet_amount, 
+            self.currency_used, 
+            "tails", 
+            self.current_flips, 
+            self.current_multiplier
+        )
 
     @discord.ui.button(label="Cash Out", style=discord.ButtonStyle.success, emoji="💰")
     async def cashout_button(self, button, interaction):
@@ -412,7 +424,7 @@ class ProgressiveCoinflipCog(commands.Cog):
         """Start the progressive coinflip game after the user selects a side"""
 
         # Initial multiplier
-        initial_multiplier = 1.96
+        initial_multiplier = 1.96ultiplier = 1.96
 
         # Create animated coinflip
         try:
