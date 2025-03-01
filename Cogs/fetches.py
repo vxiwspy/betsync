@@ -253,10 +253,23 @@ class Fetches(commands.Cog):
             stat_icon = "🏆" if stat_type == "wins" else "❌"
 
             title_text = "Wins" if stat_type == "wins" else "Losses"
-
+            
+            # Find user's position in the full leaderboard
+            user_id = self.all_data.get("author_id")
+            user_position = None
+            for i, user in enumerate(self.all_data["users"]):
+                if user["id"] == user_id:
+                    user_position = i + 1
+                    break
+            
+            description = f"Top users ranked by total {stat_type}"
+            if user_position:
+                user_amount = next((user["amount"] for user in self.all_data["users"] if user["id"] == user_id), 0)
+                description += f"\n\n**Your Rank: #{user_position}** with **{user_amount:,.0f}** {stat_type}"
+            
             embed = discord.Embed(
                 title=f"{stat_icon} {scope_text} {title_text} Leaderboard",
-                description=f"Top users ranked by total {stat_type}",
+                description=description,
                 color=0x00FFAE if stat_type == "wins" else 0xFF5500
             )
 
@@ -280,10 +293,23 @@ class Fetches(commands.Cog):
 
         def create_wagered_embed(self, users_data, start_idx):
             scope_text = self.scope.capitalize()
-
+            
+            # Find user's position in the full leaderboard
+            user_id = self.all_data.get("author_id")
+            user_position = None
+            for i, user in enumerate(self.all_data["users"]):
+                if user["id"] == user_id:
+                    user_position = i + 1
+                    break
+            
+            description = f"Top users ranked by total amount wagered"
+            if user_position:
+                user_amount = next((user["amount"] for user in self.all_data["users"] if user["id"] == user_id), 0)
+                description += f"\n\n**Your Rank: #{user_position}** with **{user_amount:,.2f}** wagered"
+            
             embed = discord.Embed(
                 title=f"🔥 {scope_text} Wagering Leaderboard",
-                description=f"Top users ranked by total amount wagered",
+                description=description,
                 color=0xFF5500
             )
 
@@ -434,7 +460,8 @@ class Fetches(commands.Cog):
             "scope": "global",
             "type": "stats",
             "stat_type": stat_type,
-            "bot_avatar": self.bot.user.avatar.url
+            "bot_avatar": self.bot.user.avatar.url,
+            "author_id": ctx.author.id
         }
 
         # Create and send the paginated view
@@ -489,7 +516,8 @@ class Fetches(commands.Cog):
             "scope": "server",
             "type": "stats",
             "stat_type": stat_type,
-            "bot_avatar": self.bot.user.avatar.url
+            "bot_avatar": self.bot.user.avatar.url,
+            "author_id": ctx.author.id
         }
 
         # Create and send the paginated view
@@ -528,7 +556,8 @@ class Fetches(commands.Cog):
             "users": formatted_users,
             "scope": "global",
             "type": "wagered",
-            "bot_avatar": self.bot.user.avatar.url
+            "bot_avatar": self.bot.user.avatar.url,
+            "author_id": ctx.author.id
         }
 
         # Create and send the paginated view
@@ -581,7 +610,8 @@ class Fetches(commands.Cog):
             "users": formatted_users,
             "scope": "server",
             "type": "wagered",
-            "bot_avatar": self.bot.user.avatar.url
+            "bot_avatar": self.bot.user.avatar.url,
+            "author_id": ctx.author.id
         }
 
         # Create and send the paginated view
