@@ -27,7 +27,7 @@ class WheelCog(commands.Cog):
         """Play the wheel game - bet on colors with different multipliers!"""
         if not bet_amount:
             embed = discord.Embed(
-                title=":wheel_of_fortune: How to Play Wheel",
+                title="<a:hersheyparkSpin:1345317103158431805> How to Play Wheel",
                 description=(
                     "**Wheel** is a game where you bet and win based on where the wheel lands.\n\n"
                     "**Usage:** `!wheel <amount> [currency_type]`\n"
@@ -208,7 +208,7 @@ class WheelCog(commands.Cog):
 
         # Create initial wheel embed
         wheel_embed = discord.Embed(
-            title=":wheel_of_fortune: Wheel of Fortune",
+            title="<a:hersheyparkSpin:1345317103158431805> Wheel of Fortune",
             description=(
                 "The wheel is spinning...\n\n"
                 "**Your Bet:** "
@@ -271,7 +271,7 @@ class WheelCog(commands.Cog):
                     inline=False
                 )
                 await wheel_message.edit(embed=wheel_embed)
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.2)
 
         # Calculate result with house edge (3-5%)
         # Implement a small house edge by slightly adjusting the chances
