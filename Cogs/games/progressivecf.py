@@ -432,7 +432,7 @@ class ProgressiveCoinflipCog(commands.Cog):
         """Start the progressive coinflip game after the user selects a side"""
 
         # Initial multiplier
-        initial_multiplier = 1.96
+        initial_multiplier = 1
 
         # Create animated coinflip
         try:
