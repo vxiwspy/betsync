@@ -608,15 +608,6 @@ class ProgressiveCoinflipCog(commands.Cog):
         # Calculate winnings (only credits)
         winnings = bet_amount * multiplier
 
-        # Add proper interaction check
-        responded = False
-        if interaction:
-            try:
-                # Check if response is already done
-                await interaction.response.defer()
-            except discord.errors.InteractionResponded:
-                responded = True
-
         # Create cashout embed
         cashout_embed = discord.Embed(
             title="🪙 | Progressive Coinflip - CASHED OUT!",
@@ -635,13 +626,16 @@ class ProgressiveCoinflipCog(commands.Cog):
         cashout_embed.set_footer(text="BetSync Casino", icon_url=self.bot.user.avatar.url)
 
         # Update message
-        if interaction and not responded:
-            await interaction.response.edit_message(embed=cashout_embed, view=None)
-        elif not interaction:
-            await message.edit(embed=cashout_embed, view=None)
+        if interaction:
+            try:
+                # Try to use response first
+                await interaction.response.edit_message(embed=cashout_embed, view=None)
+            except discord.errors.InteractionResponded:
+                # If already responded, edit the message directly
+                await message.edit(embed=cashout_embed, view=None)
         else:
-            await ctx.send(embed=cashout_embed)
-
+            # No interaction, just edit the message directly
+            await message.edit(embed=cashout_embed, view=None)
 
         # Process win
         await self.process_win(ctx, bet_amount, multiplier, flips)
