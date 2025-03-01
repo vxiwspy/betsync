@@ -117,6 +117,11 @@ class PCFView(discord.ui.View):
 
             # Update the message
             await interaction.response.edit_message(embed=embed, view=self)
+            
+            # Add play again button
+            play_again_view = PlayAgainView(self.cog, self.ctx, self.bet_amount, self.currency_used)
+            await interaction.message.edit(view=play_again_view)
+            play_again_view.message = interaction.message
 
             # Process loss (if they've already flipped some coins)
             if self.current_flips > 0:
@@ -197,6 +202,86 @@ class PCFView(discord.ui.View):
             # Clean up ongoing game
             if self.ctx.author.id in self.cog.ongoing_games:
                 del self.cog.ongoing_games[self.ctx.author.id]
+
+
+class PlayAgainView(discord.ui.View):
+    """View with a Play Again button that shows after a game ends"""
+    def __init__(self, cog, ctx, bet_amount, currency_used, timeout=60):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.ctx = ctx
+        self.bet_amount = bet_amount
+        self.currency_used = currency_used
+        self.message = None
+
+    @discord.ui.button(label="Play Again", style=discord.ButtonStyle.primary)
+    async def play_again_button(self, button, interaction):
+        if interaction.user.id != self.ctx.author.id:
+            return await interaction.response.send_message("This is not your game!", ephemeral=True)
+
+        # Disable button to prevent double-clicks
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+
+        # Check if user can afford the bet amount
+        db = Users()
+        user_data = db.fetch_user(self.ctx.author.id)
+        tokens_balance = user_data.get('tokens', 0)
+        credits_balance = user_data.get('credits', 0)
+        total_balance = tokens_balance + credits_balance
+
+        if total_balance < self.bet_amount:
+            # User cannot afford the same bet
+            confirm_embed = discord.Embed(
+                title="⚠️ | Lower Bet Required",
+                description=f"You don't have enough funds for the same bet amount. Would you like to bet all your remaining funds ({total_balance:.2f})?",
+                color=discord.Color.yellow()
+            )
+            
+            confirm_view = discord.ui.View(timeout=30)
+            
+            @discord.ui.button(label="Yes", style=discord.ButtonStyle.success)
+            async def confirm_button(b, i):
+                if i.user.id != self.ctx.author.id:
+                    return await i.response.send_message("This is not your game!", ephemeral=True)
+                
+                for child in confirm_view.children:
+                    child.disabled = True
+                await i.response.edit_message(view=confirm_view)
+                await i.followup.send("Starting a new game with adjusted bet...", ephemeral=True)
+                
+                # Start a new game with the max bet amount
+                await self.cog.progressivecf(self.ctx, str(total_balance), self.currency_used)
+            
+            @discord.ui.button(label="No", style=discord.ButtonStyle.danger)
+            async def cancel_button(b, i):
+                if i.user.id != self.ctx.author.id:
+                    return await i.response.send_message("This is not your game!", ephemeral=True)
+                
+                for child in confirm_view.children:
+                    child.disabled = True
+                await i.response.edit_message(view=confirm_view)
+                await i.followup.send("Progressive Coinflip cancelled.", ephemeral=True)
+            
+            confirm_view.add_item(confirm_button)
+            confirm_view.add_item(cancel_button)
+            
+            await interaction.followup.send(embed=confirm_embed, view=confirm_view, ephemeral=True)
+        else:
+            # User can afford the same bet
+            await interaction.followup.send("Starting a new game with the same bet...", ephemeral=True)
+            await self.cog.progressivecf(self.ctx, str(self.bet_amount), self.currency_used)
+    
+    async def on_timeout(self):
+        # Disable button after timeout
+        for item in self.children:
+            item.disabled = True
+        
+        try:
+            await self.message.edit(view=self)
+        except:
+            pass
 
 
 class ProgressiveCoinflipCog(commands.Cog):
@@ -420,6 +505,11 @@ class ProgressiveCoinflipCog(commands.Cog):
             await message.edit(embed=cashout_embed, view=None)
         except:
             pass
+
+        # Add play again button
+        play_again_view = PlayAgainView(self, ctx, bet_amount, currency_used)
+        await message.edit(view=play_again_view)
+        play_again_view.message = message
 
         # Process win
         # Add credits to user
