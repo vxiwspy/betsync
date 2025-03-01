@@ -5,6 +5,9 @@ from discord.ext import commands
 from pymongo import ReturnDocument
 from Cogs.utils.mongo import Users, Servers
 from Cogs.utils.emojis import emoji
+from dotenv import load_dotenv
+
+load_dotenv()
 
 #globals
 
