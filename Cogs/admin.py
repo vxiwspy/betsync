@@ -109,7 +109,7 @@ class AdminCommands(commands.Cog):
         await ctx.reply(embed=embed)
         
     @commands.command(name="addadmin")
-    async def addadmin(self, ctx, user: discord.Member):
+    async def addadmin(self, ctx, user: discord.Member = None):
         """Add a user as a server admin in the database (Bot Admin only)
         
         Usage: !addadmin @user
@@ -120,6 +120,20 @@ class AdminCommands(commands.Cog):
                 title="<:no:1344252518305234987> | Access Denied",
                 description="This command is restricted to administrators only.",
                 color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+        
+        # Check if user is provided
+        if user is None:
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Invalid Usage",
+                description="Please mention a user to add as an admin.",
+                color=0xFF0000
+            )
+            embed.add_field(
+                name="Correct Usage",
+                value="`!addadmin @user`",
+                inline=False
             )
             return await ctx.reply(embed=embed)
         
@@ -161,6 +175,82 @@ class AdminCommands(commands.Cog):
             color=0x00FFAE
         )
         embed.set_footer(text=f"Admin: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
+        
+        await ctx.reply(embed=embed)
+        
+    @commands.command(name="viewadmins")
+    async def viewadmins(self, ctx, server_id: int = None):
+        """View server admins across all servers (Bot Admin only)
+        
+        Usage: !viewadmins [server_id]
+        """
+        # Check if the user is a bot admin (in admins.txt)
+        if not self.is_admin(ctx.author.id):
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Access Denied",
+                description="This command is restricted to bot administrators only.",
+                color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+        
+        # If server_id is provided, get that server's admins
+        if server_id:
+            db = Servers()
+            server_data = db.fetch_server(server_id)
+            
+            if not server_data:
+                embed = discord.Embed(
+                    title="<:no:1344252518305234987> | Server Not Found",
+                    description=f"Server with ID `{server_id}` isn't registered in our database.",
+                    color=0xFF0000
+                )
+                return await ctx.reply(embed=embed)
+            
+            server_name = server_data.get("server_name", f"Unknown Server ({server_id})")
+            server_admins = server_data.get("server_admins", [])
+            
+            embed = discord.Embed(
+                title=f"👑 Server Admins for {server_name}",
+                description=f"Server ID: `{server_id}`",
+                color=0x00FFAE
+            )
+            
+            if not server_admins:
+                embed.add_field(
+                    name="No Admins",
+                    value="This server has no admins configured.",
+                    inline=False
+                )
+            else:
+                admin_list = []
+                for admin_id in server_admins:
+                    admin_list.append(f"<@{admin_id}> (`{admin_id}`)")
+                
+                embed.add_field(
+                    name=f"Admins ({len(server_admins)})",
+                    value="\n".join(admin_list) if admin_list else "None",
+                    inline=False
+                )
+        else:
+            # If no server_id is provided, show usage
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Invalid Usage",
+                description="Please specify a server ID to view its admins.",
+                color=0xFF0000
+            )
+            embed.add_field(
+                name="Correct Usage",
+                value="`!viewadmins server_id`",
+                inline=False
+            )
+            embed.add_field(
+                name="Example",
+                value=f"`!viewadmins {ctx.guild.id}`",
+                inline=False
+            )
+            return await ctx.reply(embed=embed)
+        
+        embed.set_footer(text=f"Requested by: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
         
         await ctx.reply(embed=embed)
         

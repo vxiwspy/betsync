@@ -159,16 +159,47 @@ class ServersCog(commands.Cog):
 
     @commands.command(aliases=["ss"])
     async def serverstats(self, ctx):
+        """View server stats (Server Admins and Bot Admins only)
+        
+        Usage: !serverstats
+        """
+        # Check if user is authorized (in admins.txt or server_admins)
         db = Servers()
         server_data = db.fetch_server(ctx.guild.id)
-
+        
+        if not server_data:
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Server Not Found",
+                description="This server isn't registered in our database. Please contact the developer.",
+                color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+            
+        # Check if user is a server admin or in admins.txt
+        server_admins = server_data.get("server_admins", [])
+        
+        # Load admin IDs from admins.txt
+        admin_ids = []
+        try:
+            with open("admins.txt", "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and line.isdigit():
+                        admin_ids.append(int(line))
+        except Exception as e:
+            print(f"Error loading admin IDs: {e}")
+        
+        # Check if user is authorized
+        if ctx.author.id not in admin_ids and ctx.author.id not in server_admins:
+            embed = discord.Embed(
+                title="<:no:1344252518305234987> | Access Denied",
+                description="This command is restricted to server administrators only.",
+                color=0xFF0000
+            )
+            return await ctx.reply(embed=embed)
+        
         total_profit = server_data["total_profit"]
-        server_admins = server_data["server_admins"]
         giveaway_channel = server_data["giveaway_channel"]
-
-        #if count(server_admins) == 0: server_admins = None
-
-        #if giveaway_channel == None: giveaway_channel = "Not Set"
 
         embed = discord.Embed(title=f":stars: Server Stats for {ctx.guild.name}", color=0x00FFAE)
         money = emoji()["money"]
