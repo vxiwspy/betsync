@@ -443,7 +443,7 @@ class CrashCog(commands.Cog):
                         winnings = round(bet_amount * crash_game.cash_out_multiplier, 2)  # Round to 2 decimal places
                         feedback_embed = discord.Embed(
                             title="✅ Cash Out Successful!",
-                            description=f"You cashed out at **{crash_game.cash_out_multiplier:.2f}x**\nWinnings: **{winnings} credits**",
+                            description=f"You cashed out at **{crash_game.cash_out_multiplier:.2f}x**\nWinnings: **{round(winnings, 2)} credits**",
                             color=0x00FF00
                         )
                         await ctx.send(embed=feedback_embed, delete_after=5)
@@ -628,8 +628,8 @@ class CrashCog(commands.Cog):
                     embed.description = (
                         f"{bet_description}\n"
                         f"**Cashed Out At:** {cash_out_multiplier:.2f}x\n"
-                        f"**Winnings:** {winnings} credits\n"
-                        f"**Profit:** {profit} credits"
+                        f"**Winnings:** {round(winnings, 2)} credits\n"
+                        f"**Profit:** {round(profit, 2)} credits"
                     )
                     embed.color = 0x00FF00
 
