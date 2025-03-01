@@ -14,7 +14,7 @@ load_dotenv()
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all(), case_insensitive=True)
 bot.remove_command("help")
 
-cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start", "Cogs.currency", "Cogs.history", "Cogs.tip", "Cogs.games.crash", "Cogs.games.dice", "Cogs.games.coinflip", "Cogs.games.mines", "Cogs.games.plinko", "Cogs.games.penalty", "Cogs.admin", "Cogs.servers", "Cogs.games.wheel"]
+cogs = ["Cogs.guide", "Cogs.fetches", "Cogs.start", "Cogs.currency", "Cogs.history", "Cogs.tip", "Cogs.games.crash", "Cogs.games.dice", "Cogs.games.coinflip", "Cogs.games.mines", "Cogs.games.plinko", "Cogs.games.penalty", "Cogs.admin", "Cogs.servers", "Cogs.games.wheel", "Cogs.games.progressivecf"]
 
 @bot.event
 async def on_command_error(ctx, error):
